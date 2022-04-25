@@ -8,8 +8,8 @@ Subject: [PATCH] Fix attempt to use poisoned calloc error in libgccjit
 
 This moves usages of pthread.h to above any usage of system.h as it
 included #pragma GCC poison calloc
---- a/gcc/jit/jit-playback.c
-+++ b/gcc/jit/jit-playback.c
+--- a/gcc/jit/jit-playback.cc
++++ b/gcc/jit/jit-playback.cc
 @@ -18,6 +18,8 @@ You should have received a copy of the GNU General Public License
  along with GCC; see the file COPYING3.  If not see
  <http://www.gnu.org/licenses/>.  */
@@ -28,8 +28,8 @@ included #pragma GCC poison calloc
  #include "jit-playback.h"
  #include "jit-result.h"
  #include "jit-builtins.h"
---- a/gcc/jit/jit-recording.c
-+++ b/gcc/jit/jit-recording.c
+--- a/gcc/jit/jit-recording.cc
++++ b/gcc/jit/jit-recording.cc
 @@ -18,6 +18,8 @@ You should have received a copy of the GNU General Public License
  along with GCC; see the file COPYING3.  If not see
  <http://www.gnu.org/licenses/>.  */
@@ -48,8 +48,8 @@ included #pragma GCC poison calloc
  #include "jit-builtins.h"
  #include "jit-recording.h"
  #include "jit-playback.h"
---- a/gcc/jit/libgccjit.c
-+++ b/gcc/jit/libgccjit.c
+--- a/gcc/jit/libgccjit.cc
++++ b/gcc/jit/libgccjit.cc
 @@ -18,13 +18,14 @@ You should have received a copy of the GNU General Public License
  along with GCC; see the file COPYING3.  If not see
  <http://www.gnu.org/licenses/>.  */

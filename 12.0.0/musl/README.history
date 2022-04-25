@@ -1,3 +1,11 @@
+3               25 Apr 2022
+
+	- 25_all_multilib_pure64.patch
+	- 50_all_posix_memalign.patch
+	U 50_all_calloc_libgccjit.patch
+	- 50_all_cpu_indicator.patch
+	- nocross/50_all_libssp_unconditionally.patch
+
 2		25 Apr 2022
 
         - 25_all_multilib_pure64.patch
