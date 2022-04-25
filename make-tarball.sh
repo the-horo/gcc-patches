@@ -6,6 +6,7 @@ find_ebuild() {
 
 	for ebuild in \
 		${ver} \
+		~/git/gentoo/sys-devel/gcc/gcc-${ver}.ebuild \
 		/usr/local/src/gentoo/repo/gentoo/sys-devel/gcc/gcc-${ver}.ebuild \
 		"$(portageq get_repo_path $(portageq envvar EPREFIX)/ gentoo)"/sys-devel/gcc/gcc-${ver}.ebuild \
 		/usr/portage/sys-devel/gcc/gcc-${ver}.ebuild \
