@@ -1,0 +1,112 @@
+diff --git a/libstdc++-v3/src/Makefile.am b/libstdc++-v3/src/Makefile.am
+index f92a52748c5..cdf0c89c5a7 100644
+--- a/libstdc++-v3/src/Makefile.am
++++ b/libstdc++-v3/src/Makefile.am
+@@ -266,7 +266,6 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) \
+ 	$(LTLDFLAGS) $(LTLIBICONV) \
+ 	-o $@
+diff --git a/libstdc++-v3/src/Makefile.in b/libstdc++-v3/src/Makefile.in
+index 2fff46209ad..4d19c943757 100644
+--- a/libstdc++-v3/src/Makefile.in
++++ b/libstdc++-v3/src/Makefile.in
+@@ -630,7 +630,6 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) \
+ 	$(LTLDFLAGS) $(LTLIBICONV) \
+ 	-o $@
+diff --git a/libstdc++-v3/src/c++11/Makefile.am b/libstdc++-v3/src/c++11/Makefile.am
+index a26903db6bc..299592b82f5 100644
+--- a/libstdc++-v3/src/c++11/Makefile.am
++++ b/libstdc++-v3/src/c++11/Makefile.am
+@@ -214,5 +214,4 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX --tag disable-shared \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) $(LTLDFLAGS) -o $@
+diff --git a/libstdc++-v3/src/c++11/Makefile.in b/libstdc++-v3/src/c++11/Makefile.in
+index 86540509e81..2fe04633f15 100644
+--- a/libstdc++-v3/src/c++11/Makefile.in
++++ b/libstdc++-v3/src/c++11/Makefile.in
+@@ -580,7 +580,6 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX --tag disable-shared \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) $(LTLDFLAGS) -o $@
+ 
+ all: all-am
+diff --git a/libstdc++-v3/src/c++17/Makefile.am b/libstdc++-v3/src/c++17/Makefile.am
+index 2aebc6d5251..e6a4054ddff 100644
+--- a/libstdc++-v3/src/c++17/Makefile.am
++++ b/libstdc++-v3/src/c++17/Makefile.am
+@@ -132,5 +132,4 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX --tag disable-shared \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) $(LTLDFLAGS) -o $@
+diff --git a/libstdc++-v3/src/c++17/Makefile.in b/libstdc++-v3/src/c++17/Makefile.in
+index 8c02be6514f..d76d8a043e8 100644
+--- a/libstdc++-v3/src/c++17/Makefile.in
++++ b/libstdc++-v3/src/c++17/Makefile.in
+@@ -509,7 +509,6 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX --tag disable-shared \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) $(LTLDFLAGS) -o $@
+ 
+ all: all-am
+diff --git a/libstdc++-v3/src/c++20/Makefile.am b/libstdc++-v3/src/c++20/Makefile.am
+index 5d0af9eb627..8f7ffbb56cb 100644
+--- a/libstdc++-v3/src/c++20/Makefile.am
++++ b/libstdc++-v3/src/c++20/Makefile.am
+@@ -101,5 +101,4 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX --tag disable-shared \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) $(LTLDFLAGS) -o $@
+diff --git a/libstdc++-v3/src/c++20/Makefile.in b/libstdc++-v3/src/c++20/Makefile.in
+index e6892d370fb..903b3c3daf0 100644
+--- a/libstdc++-v3/src/c++20/Makefile.in
++++ b/libstdc++-v3/src/c++20/Makefile.in
+@@ -486,7 +486,6 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX --tag disable-shared \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) $(LTLDFLAGS) -o $@
+ 
+ all: all-am
+diff --git a/libstdc++-v3/src/c++98/Makefile.am b/libstdc++-v3/src/c++98/Makefile.am
+index 0fa6ab95fb4..58c613f805e 100644
+--- a/libstdc++-v3/src/c++98/Makefile.am
++++ b/libstdc++-v3/src/c++98/Makefile.am
+@@ -268,5 +268,4 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX --tag disable-shared \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) $(LTLDFLAGS) -o $@
+diff --git a/libstdc++-v3/src/c++98/Makefile.in b/libstdc++-v3/src/c++98/Makefile.in
+index 94c68487fde..0756ecd9528 100644
+--- a/libstdc++-v3/src/c++98/Makefile.in
++++ b/libstdc++-v3/src/c++98/Makefile.in
+@@ -582,7 +582,6 @@ CXXLINK = \
+ 	$(LIBTOOL) --tag CXX --tag disable-shared \
+ 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CXX) \
+-	$(VTV_CXXLINKFLAGS) \
+ 	$(OPT_LDFLAGS) $(SECTION_LDFLAGS) $(AM_CXXFLAGS) $(LTLDFLAGS) -o $@
+ 
+ all: all-am
