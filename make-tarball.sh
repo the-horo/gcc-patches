@@ -25,6 +25,7 @@ if [[ $# -ne 1 ]] ; then
 fi
 
 ver=${1%/}
+orig_ver=${ver}
 
 ebuild=$(find_ebuild ${ver})
 
@@ -49,10 +50,11 @@ if [[ -z ${ebuild} ]] ; then
 fi
 
 if [[ -z ${ebuild} ]] ; then
+	ver=${orig_ver}
 	ver=${ver%%_p*}
 
 	ver_major=$(echo ${ver} | cut -d'.' -f1)
-	ver_minor=$(($(echo ${ver} | cut -d'.' -f3) - 1))
+	ver_minor=$(($(echo ${ver} | cut -d'.' -f2) - 1))
 	ver="${ver_major}.${ver_minor}.1_p*"
 
 	ebuild=$(find_ebuild ${ver})
@@ -80,7 +82,7 @@ if [[ ${had_pre} -eq 1 ]] ; then
 	gver="${gver_major}.${gver_minor}.0"
 elif [[ ${had_p} -eq 1 ]] ; then
 	gver_major=$(echo ${gver} | cut -d'.' -f1)
-	gver_minor=$(($(echo ${gver} | cut -d'.' -f3) - 1))
+	gver_minor=$(($(echo ${gver} | cut -d'.' -f2) + 1))
 	gver="${gver_major}.${gver_minor}.0"
 fi
 
