@@ -1,3 +1,6 @@
+1		22 May 2022
+	U 22_all_libstdcxx-no-vtv.patch
+
 0		27 November 2021
 	+ 01_all_default-fortify-source.patch
 	+ 02_all_default-warn-format-security.patch
