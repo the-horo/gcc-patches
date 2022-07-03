@@ -1,8 +1,8 @@
 6		03 Jul 2022
 	- 50_all_calloc_libgccjit.patch
 
-5		?? ??? ???
-	? ????
+5		26 Jun 2022
+	U 50_all_calloc_libgccjit.patch
 
 4		26 Jun 2022
 	U 50_all_calloc_libgccjit.patch
