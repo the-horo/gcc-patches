@@ -1,4 +1,7 @@
-2		03 Jul	2022
+3		22 Aug 2022
+	+ 75_all_glibc_236.patch
+
+2		03 Jul 2022
 	+ 33_all_msgfmt-libstdc++-link.patch
 
 1		22 May 2022
