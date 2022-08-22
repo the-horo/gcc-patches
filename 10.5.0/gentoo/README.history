@@ -1,4 +1,4 @@
-0		?? ???? ????
+0		22 Aug 2022
 	+ 01_all_default-fortify-source.patch
 	+ 02_all_default-warn-format-security.patch
 	+ 03_all_default-warn-trampolines.patch
@@ -32,4 +32,5 @@
 	+ 31_all_fno-delayed-branch.patch
 	+ 32_all_vtv-slibtool.patch
 	+ 33_all_msgfmt-libstdc++-link.patch
+	+ 34_all_drop_CFLAGS_sed.patch
 	+ 75_all_d_compiler_for_build_pie.patch
