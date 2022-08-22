@@ -1,6 +1,7 @@
 https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=d2356ebb0084a0d80dbfe33040c9afe938c15d19
 https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=a55184ada8e2887ca94c0ab07027617885beafc9
 https://bugs.gentoo.org/865879
+https://bugs.gentoo.org/864717
 
 Fix build w/ glibc 2.36.
 
