@@ -1,3 +1,6 @@
+7		22 August 2022
+	+ 28_all_drop_CFLAGS_sed.patch
+
 6		22 August 2022
 	+ 77_all_glibc_236.patch
 
