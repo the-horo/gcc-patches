@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #set -x
 
 XZ_OPT=${XZ_OPT-"-T0 -9"}
