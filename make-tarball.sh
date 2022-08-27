@@ -1,6 +1,9 @@
 #!/bin/bash
 #set -x
 
+XZ_OPT=${XZ_OPT-"-T0 -9"}
+export XZ_OPT
+
 find_ebuild() {
 	local ver=$1
 
