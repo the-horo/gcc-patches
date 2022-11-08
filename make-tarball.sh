@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-#set -x
 
-XZ_OPT=${XZ_OPT-"-T0 -9"}
+XZ_OPT=${XZ_OPT-"-T0"}
 export XZ_OPT
 
 find_ebuild() {
@@ -41,6 +40,7 @@ ebuild=$(find_ebuild ${ver})
 # For such cases, use 11.3 as ver.)
 had_pre=0
 had_p=0
+
 if [[ -z ${ebuild} ]] ; then
 	ver=${ver%%_pre*}
 
@@ -50,6 +50,17 @@ if [[ -z ${ebuild} ]] ; then
 	ebuild=$(find_ebuild ${ver})
 
 	[[ -n ${ebuild} ]] && had_pre=1
+fi
+
+if [[ -z ${ebuild} ]] ; then
+	ver=${orig_ver%%_p*}
+
+	ver_major=$(echo ${ver} | cut -d'.' -f1)
+	ver_minor=$(($(echo ${ver} | cut -d'.' -f2) - 1))
+	ver="${ver_major}.${ver_minor}.0_pre*"
+	ebuild=$(find_ebuild ${ver})
+
+	[[ -n ${ebuild} ]] && had_p=1
 fi
 
 if [[ -z ${ebuild} ]] ; then
