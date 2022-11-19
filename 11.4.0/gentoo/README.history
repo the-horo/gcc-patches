@@ -1,3 +1,6 @@
+3		19 Nov 2022
+	+ 77_all_configure-c89.patch
+
 2		22 Aug 2022
 	+ 28_all_drop_CFLAGS_sed.patch
 
