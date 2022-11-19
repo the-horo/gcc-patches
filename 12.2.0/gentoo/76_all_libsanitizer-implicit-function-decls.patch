@@ -1,0 +1,35 @@
+https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=6be2672e4ee41c566a9e072088cccca263bab5f7
+
+From 942a325c81136138c4c199f8ab3e89a1945c3790 Mon Sep 17 00:00:00 2001
+From: Florian Weimer <fweimer@redhat.com>
+Date: Tue, 18 Oct 2022 16:58:48 +0200
+Subject: [PATCH 1/2] libsanitizer: Avoid implicit function declaration in
+ configure test
+
+libsanitizer/
+
+	* configure.ac (sanitizer_supported): Include <unistd.h> for
+	syscall prototype.
+	* configure: Regenerate.
+--- a/libsanitizer/configure
++++ b/libsanitizer/configure
+@@ -16028,6 +16028,7 @@ case "$target" in
+     cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ #include <sys/syscall.h>
++#include <unistd.h>
+ int
+ main ()
+ {
+--- a/libsanitizer/configure.ac
++++ b/libsanitizer/configure.ac
+@@ -161,7 +161,8 @@ case "$target" in
+   *-*-linux*)
+     # Some old Linux distributions miss required syscalls.
+     sanitizer_supported=no
+-    AC_TRY_COMPILE([#include <sys/syscall.h>],[
++    AC_TRY_COMPILE([#include <sys/syscall.h>
++#include <unistd.h>],[
+       syscall (__NR_gettid);
+       syscall (__NR_futex);
+       syscall (__NR_exit_group);
