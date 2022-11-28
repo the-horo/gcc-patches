@@ -1,3 +1,8 @@
+	- 23_all_EXTRA_OPTIONS-z-now.patch
+	+ 23_all_DEF_GENTOO_ZNOW-z-now.patch
+	- 24_all_EXTRA_OPTIONS-fstack-clash-protection.patch
+	+ 24_all_DEF_GENTOO_SCP-fstack-clash-protection.patch
+
 2	8 November 2022
 	- 12_all_disable-systemtap-switch.patch
 

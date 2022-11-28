@@ -1,4 +1,4 @@
-On Hardened we add some options like -fstack-clash-protection.
+We add -fstack-clash-protection if requested
 
 --- a/gcc/common.opt
 +++ a/gcc/common.opt
@@ -19,7 +19,7 @@ On Hardened we add some options like -fstack-clash-protection.
  
 +/* Default value for flag_clash_protector when flag_clash_protector is
 +   initialized to -1.  */
-+#ifdef EXTRA_OPTIONS
++#ifdef DEF_GENTOO_SCP
 +#define DEFAULT_FLAG_SCP 1
 +#endif
 +#ifndef DEFAULT_FLAG_SCP

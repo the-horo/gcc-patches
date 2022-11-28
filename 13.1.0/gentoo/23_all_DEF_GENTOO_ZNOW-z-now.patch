@@ -1,4 +1,4 @@
-On Hardened we add some options like -z now
+If requested we add -z now
 
 --- a/gcc/gcc.cc
 +++ b/gcc/gcc.cc
@@ -6,7 +6,7 @@ On Hardened we add some options like -z now
  #endif
  #endif
  
-+#ifdef EXTRA_OPTIONS
++#ifdef DEF_GENTOO_ZNOW
 +#define LINK_NOW_SPEC "%{!nonow:-z now} "
 +#else
 +#define LINK_NOW_SPEC ""
