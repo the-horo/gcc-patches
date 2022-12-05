@@ -1,3 +1,9 @@
+	- 23_all_EXTRA_OPTIONS-z-now.patch
+	+ 23_all_DEF_GENTOO_ZNOW-z-now.patch
+	- 24_all_EXTRA_OPTIONS-fstack-clash-protection.patch
+	+ 24_all_DEF_GENTOO_SCP-fstack-clash-protection.patch
+
+
 2		19 Nov 2022
 	+ 76_all_libsanitizer-implicit-function-decls.patch
 	+ 77_all_libiberty-fix-c89-isms-in-configure.patch
