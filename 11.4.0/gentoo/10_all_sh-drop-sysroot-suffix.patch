@@ -10,12 +10,6 @@ multilib flavour always prepends sysroot-prefix.
 Bug: https://bugs.gentoo.org/511548
 Bug: https://gcc.gnu.org/PR42947
 Signed-off-by: Sergei Trofimovich <slyfox@gentoo.org>
----
- gcc/config.gcc | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/gcc/config.gcc b/gcc/config.gcc
-index 55c314afdbd..c320f24f123 100644
 --- a/gcc/config.gcc
 +++ b/gcc/config.gcc
 @@ -2866,8 +2866,6 @@ sh-*-elf* | sh[12346l]*-*-elf* | \

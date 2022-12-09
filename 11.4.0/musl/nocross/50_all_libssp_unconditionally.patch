@@ -10,8 +10,8 @@ case when bootstrapping gcc, the piepatches do not seem to fully fix the
 crosstoolchain and  bootstrap sequence wrt. stack-protector flag usage."
 
 (We do the same in Gentoo.)
---- gcc-6.1.0/gcc/gcc.c.orig
-+++ gcc-6.1.0/gcc/gcc.c
+--- a/gcc/gcc.c.orig
++++ b/gcc/gcc.c
 @@ -870,8 +870,7 @@
  
  #ifndef LINK_SSP_SPEC

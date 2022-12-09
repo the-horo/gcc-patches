@@ -6,12 +6,6 @@ Date: Sat, 28 Jul 2018 11:33:27 +0100
 Subject: [PATCH] libgcc: m68k: avoid absolute relocation in shared library
 
 Signed-off-by: Sergei Trofimovich <slyfox@gentoo.org>
----
- libgcc/config/m68k/lb1sf68.S | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
-
-diff --git a/libgcc/config/m68k/lb1sf68.S b/libgcc/config/m68k/lb1sf68.S
-index 325a7c17d9b..16c6dc3f5a7 100644
 --- a/libgcc/config/m68k/lb1sf68.S
 +++ b/libgcc/config/m68k/lb1sf68.S
 @@ -435,7 +435,10 @@ $_exception_handler:

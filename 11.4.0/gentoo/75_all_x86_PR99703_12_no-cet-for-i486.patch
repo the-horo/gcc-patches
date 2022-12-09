@@ -19,8 +19,6 @@ config/
 All applicable configure scripts have been regenerated. Patch hunks
 which only updated line numbers have been excluded to reduce conflicts.
 
-diff --git a/config/cet.m4 b/config/cet.m4
-index c67fb4f35b6..7718be1afe8 100644
 --- a/config/cet.m4
 +++ b/config/cet.m4
 @@ -130,6 +130,18 @@ fi
@@ -56,8 +54,6 @@ index c67fb4f35b6..7718be1afe8 100644
      if test x$enable_cet = xno -a x$have_cet = xyes; then
        AC_MSG_ERROR([Intel CET must be enabled on Intel CET enabled host])
      fi
-diff --git a/gcc/configure b/gcc/configure
-index 708328e1670..e6e4d9e270e 100755
 --- a/gcc/configure
 +++ b/gcc/configure
 @@ -32416,6 +32416,34 @@ else
@@ -103,8 +99,6 @@ index 708328e1670..e6e4d9e270e 100755
      if test x$enable_cet = xno -a x$have_cet = xyes; then
        as_fn_error $? "Intel CET must be enabled on Intel CET enabled host" "$LINENO" 5
      fi
-diff --git a/libbacktrace/configure b/libbacktrace/configure
-index 9b66bf5563a..a2f33c0f35d 100755
 --- a/libbacktrace/configure
 +++ b/libbacktrace/configure
 @@ -12517,6 +12517,34 @@ else
@@ -150,8 +144,6 @@ index 9b66bf5563a..a2f33c0f35d 100755
      if test x$enable_cet = xno -a x$have_cet = xyes; then
        as_fn_error $? "Intel CET must be enabled on Intel CET enabled host" "$LINENO" 5
      fi
-diff --git a/libcc1/configure b/libcc1/configure
-index 600e41cf5ea..b198b0b9074 100755
 --- a/libcc1/configure
 +++ b/libcc1/configure
 @@ -14653,6 +14653,34 @@ else
@@ -197,8 +189,6 @@ index 600e41cf5ea..b198b0b9074 100755
      if test x$enable_cet = xno -a x$have_cet = xyes; then
        as_fn_error $? "Intel CET must be enabled on Intel CET enabled host" "$LINENO" 5
      fi
-diff --git a/libcpp/configure b/libcpp/configure
-index 7e28606f605..9674cd9c7a7 100755
 --- a/libcpp/configure
 +++ b/libcpp/configure
 @@ -7668,6 +7668,34 @@ else
@@ -244,8 +234,6 @@ index 7e28606f605..9674cd9c7a7 100755
      if test x$enable_cet = xno -a x$have_cet = xyes; then
        as_fn_error $? "Intel CET must be enabled on Intel CET enabled host" "$LINENO" 5
      fi
-diff --git a/libdecnumber/configure b/libdecnumber/configure
-index 6b62f8ba665..da5302f9315 100755
 --- a/libdecnumber/configure
 +++ b/libdecnumber/configure
 @@ -5321,6 +5321,34 @@ else
@@ -291,8 +279,6 @@ index 6b62f8ba665..da5302f9315 100755
      if test x$enable_cet = xno -a x$have_cet = xyes; then
        as_fn_error $? "Intel CET must be enabled on Intel CET enabled host" "$LINENO" 5
      fi
-diff --git a/libiberty/configure b/libiberty/configure
-index 61c62a33b3a..14a555c4ed6 100755
 --- a/libiberty/configure
 +++ b/libiberty/configure
 @@ -5396,6 +5396,34 @@ else
@@ -338,8 +324,6 @@ index 61c62a33b3a..14a555c4ed6 100755
      if test x$enable_cet = xno -a x$have_cet = xyes; then
        as_fn_error $? "Intel CET must be enabled on Intel CET enabled host" "$LINENO" 5
      fi
-diff --git a/lto-plugin/configure b/lto-plugin/configure
-index 22a4357a58e..26aad9dd699 100755
 --- a/lto-plugin/configure
 +++ b/lto-plugin/configure
 @@ -5791,6 +5791,34 @@ else
