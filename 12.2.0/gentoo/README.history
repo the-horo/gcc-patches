@@ -1,9 +1,14 @@
+4		9 Dec 2022
+	+ 78_all_Factor-out-jobserver_active_p.patch
+	+ 79_all_lto-support-jobserver-style-fifo-for-recent-GNU-make.patch
+	+ 80_all_lto-respect-jobserver-in-parallel-WPA-streaming.patch
+	+ 81_all_jobserver-fix-fifo-mode-by-opening-pipe-in-proper-mo.patch
+
 3		5 Dec 2022
 	- 23_all_EXTRA_OPTIONS-z-now.patch
 	+ 23_all_DEF_GENTOO_ZNOW-z-now.patch
 	- 24_all_EXTRA_OPTIONS-fstack-clash-protection.patch
 	+ 24_all_DEF_GENTOO_SCP-fstack-clash-protection.patch
-
 
 2		19 Nov 2022
 	+ 76_all_libsanitizer-implicit-function-decls.patch
