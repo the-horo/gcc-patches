@@ -1,6 +1,5 @@
-diff -Naur gcc-7.1.0.orig/gcc/config/i386/pmm_malloc.h gcc-7.1.0/gcc/config/i386/pmm_malloc.h
---- gcc-7.1.0.orig/gcc/config/i386/pmm_malloc.h	2017-01-01 04:07:43.000000000 -0800
-+++ gcc-7.1.0/gcc/config/i386/pmm_malloc.h	2017-05-07 11:35:22.878398460 -0700
+--- a/gcc/config/i386/pmm_malloc.h
++++ b/gcc/config/i386/pmm_malloc.h
 @@ -27,12 +27,13 @@
  #include <stdlib.h>
  

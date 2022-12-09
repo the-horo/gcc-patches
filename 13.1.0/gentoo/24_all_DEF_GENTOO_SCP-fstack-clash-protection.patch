@@ -1,7 +1,7 @@
 We add -fstack-clash-protection if requested
 
 --- a/gcc/common.opt
-+++ a/gcc/common.opt
++++ b/gcc/common.opt
 @@ -2698,7 +2698,7 @@ Common Alias(fstack-check=, specific, no
  Insert stack checking code into the program.  Same as -fstack-check=specific.
  
