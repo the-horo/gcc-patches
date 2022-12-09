@@ -13,13 +13,6 @@ gcc/ChangeLog:
 	* opts-jobserver.h: Add one member.
 	* opts-common.cc (jobserver_info::jobserver_info): Parse FIFO
 	format of --jobserver-auth.
----
- gcc/opts-common.cc   | 17 +++++++++++++++--
- gcc/opts-jobserver.h |  2 ++
- 2 files changed, 17 insertions(+), 2 deletions(-)
-
-diff --git a/gcc/opts-common.cc b/gcc/opts-common.cc
-index 8a4d32de3e5..7c07d504696 100644
 --- a/gcc/opts-common.cc
 +++ b/gcc/opts-common.cc
 @@ -2008,8 +2008,14 @@ void prepend_xassembler_to_collect_as_options (const char *collect_as_options,
@@ -55,8 +48,6 @@ index 8a4d32de3e5..7c07d504696 100644
  	      && rfd > 0
  	      && wfd > 0
  	      && is_valid_fd (rfd)
-diff --git a/gcc/opts-jobserver.h b/gcc/opts-jobserver.h
-index 68ce188b84a..98ea2579962 100644
 --- a/gcc/opts-jobserver.h
 +++ b/gcc/opts-jobserver.h
 @@ -37,6 +37,8 @@ struct jobserver_info

@@ -25,14 +25,6 @@ gcc/lto/ChangeLog:
 	finishes.
 	(stream_out_partitions): Use job server if active.
 	(do_whole_program_analysis): Likewise.
----
- gcc/lto/lto.cc       | 58 +++++++++++++++++++++++++++++++++-----------
- gcc/opts-common.cc   | 40 ++++++++++++++++++++++++++++++
- gcc/opts-jobserver.h | 14 +++++++++++
- 3 files changed, 98 insertions(+), 14 deletions(-)
-
-diff --git a/gcc/lto/lto.cc b/gcc/lto/lto.cc
-index 31b0c1862f7..c82307f4f7e 100644
 --- a/gcc/lto/lto.cc
 +++ b/gcc/lto/lto.cc
 @@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
@@ -152,8 +144,6 @@ index 31b0c1862f7..c82307f4f7e 100644
    else
      {
        lto_parallelism = atoi (flag_wpa);
-diff --git a/gcc/opts-common.cc b/gcc/opts-common.cc
-index 7c07d504696..eed0eb7b799 100644
 --- a/gcc/opts-common.cc
 +++ b/gcc/opts-common.cc
 @@ -2057,3 +2057,43 @@ jobserver_info::jobserver_info ()
@@ -200,8 +190,6 @@ index 7c07d504696..eed0eb7b799 100644
 +  char c = 'G';
 +  gcc_assert (write (fd, &c, 1) == 1);
 +}
-diff --git a/gcc/opts-jobserver.h b/gcc/opts-jobserver.h
-index 98ea2579962..76c1d9b2882 100644
 --- a/gcc/opts-jobserver.h
 +++ b/gcc/opts-jobserver.h
 @@ -29,6 +29,18 @@ struct jobserver_info

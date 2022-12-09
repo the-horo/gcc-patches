@@ -15,12 +15,6 @@ gcc/ChangeLog:
 
 	* opts-common.cc (jobserver_info::connect): Open fifo
 	in non-blocking mode.
----
- gcc/opts-common.cc | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/gcc/opts-common.cc b/gcc/opts-common.cc
-index eed0eb7b799..98eb112cf68 100644
 --- a/gcc/opts-common.cc
 +++ b/gcc/opts-common.cc
 @@ -2062,7 +2062,7 @@ void

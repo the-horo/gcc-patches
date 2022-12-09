@@ -1,8 +1,8 @@
 We need to pass NO_PIE_CFLAGS to ALL_* so gcc don't fail when
 we compile it with older gcc and pie.
 
---- a/gcc/Makefile.in	2015-06-25 19:18:12.000000000 +0200
-+++ b/gcc/Makefile.in	2016-04-22 00:12:54.029178860 +0200
+--- a/gcc/Makefile.in
++++ b/gcc/Makefile.in
 @@ -1054,10 +1054,10 @@ ALL_CXXFLAGS = $(T_CFLAGS) $(CFLAGS-$@)
  ALL_CPPFLAGS = $(INCLUDES) $(CPPFLAGS)
  

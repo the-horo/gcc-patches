@@ -16,16 +16,6 @@ gcc/ChangeLog:
 	(run_gcc): Likewise.
 	* opts-jobserver.h: New file.
 	* opts-common.cc (jobserver_info::jobserver_info): New function.
----
- gcc/gcc.cc           | 38 +++++---------------------------------
- gcc/lto-wrapper.cc   | 44 +++++++++-----------------------------------
- gcc/opts-common.cc   | 41 +++++++++++++++++++++++++++++++++++++++++
- gcc/opts-jobserver.h | 44 ++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 99 insertions(+), 68 deletions(-)
- create mode 100644 gcc/opts-jobserver.h
-
-diff --git a/gcc/gcc.cc b/gcc/gcc.cc
-index bb07cc244e3..5699d3b51e5 100644
 --- a/gcc/gcc.cc
 +++ b/gcc/gcc.cc
 @@ -27,6 +27,7 @@ CC recognizes how to compile each input file by suffixes in the file names.
@@ -87,8 +77,6 @@ index bb07cc244e3..5699d3b51e5 100644
  }
  
  /* Determine what the exit code of the driver should be.  */
-diff --git a/gcc/lto-wrapper.cc b/gcc/lto-wrapper.cc
-index d070829bacb..9fede90c277 100644
 --- a/gcc/lto-wrapper.cc
 +++ b/gcc/lto-wrapper.cc
 @@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
@@ -183,8 +171,6 @@ index d070829bacb..9fede90c277 100644
  	      print_lto_docs_link ();
  	    }
  	  else if (parallel == 0)
-diff --git a/gcc/opts-common.cc b/gcc/opts-common.cc
-index 1663be1f602..8a4d32de3e5 100644
 --- a/gcc/opts-common.cc
 +++ b/gcc/opts-common.cc
 @@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
@@ -246,9 +232,6 @@ index 1663be1f602..8a4d32de3e5 100644
 +  if (!error_msg.empty ())
 +    error_msg = "jobserver is not available: " + error_msg;
 +}
-diff --git a/gcc/opts-jobserver.h b/gcc/opts-jobserver.h
-new file mode 100644
-index 00000000000..68ce188b84a
 --- /dev/null
 +++ b/gcc/opts-jobserver.h
 @@ -0,0 +1,44 @@
