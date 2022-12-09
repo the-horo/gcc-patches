@@ -1,0 +1,320 @@
+https://bugs.gentoo.org/884633
+
+https://build.opensuse.org/package/view_file/devel:gcc/gcc12/gcc12-fifo-jobserver-support.patch
+https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=1270ccda70ca09f7d4fe76b5156dca8992bd77a6
+
+Rebased by Arsen Arsenović <arsen@aarsen.me>.
+
+From f8ca9e3ea075f5a3743fc74ae227a361f355c0f0 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 9 Aug 2022 13:59:32 +0200
+Subject: [PATCH 1/2] Factor out jobserver_active_p.
+
+gcc/ChangeLog:
+
+	* gcc.cc (driver::detect_jobserver): Remove and move to
+	jobserver.h.
+	* lto-wrapper.cc (jobserver_active_p): Likewise.
+	(run_gcc): Likewise.
+	* opts-jobserver.h: New file.
+	* opts-common.cc (jobserver_info::jobserver_info): New function.
+--- a/gcc/gcc.c
++++ b/gcc/gcc.c
+@@ -27,6 +27,7 @@ CC recognizes how to compile each input file by suffixes in the file names.
+ Once it knows which kind of compilation to perform, the procedure for
+ compilation is specified by a string called a "spec".  */
+ 
++#define INCLUDE_STRING
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
+@@ -43,6 +44,7 @@ compilation is specified by a string called a "spec".  */
+ #include "opts.h"
+ #include "filenames.h"
+ #include "spellcheck.h"
++#include "opts-jobserver.h"
+ 
+ 
+ 
+@@ -8399,38 +8401,9 @@ driver::final_actions () const
+ void
+ driver::detect_jobserver () const
+ {
+-  /* Detect jobserver and drop it if it's not working.  */
+-  const char *makeflags = env.get ("MAKEFLAGS");
+-  if (makeflags != NULL)
+-    {
+-      const char *needle = "--jobserver-auth=";
+-      const char *n = strstr (makeflags, needle);
+-      if (n != NULL)
+-	{
+-	  int rfd = -1;
+-	  int wfd = -1;
+-
+-	  bool jobserver
+-	    = (sscanf (n + strlen (needle), "%d,%d", &rfd, &wfd) == 2
+-	       && rfd > 0
+-	       && wfd > 0
+-	       && is_valid_fd (rfd)
+-	       && is_valid_fd (wfd));
+-
+-	  /* Drop the jobserver if it's not working now.  */
+-	  if (!jobserver)
+-	    {
+-	      unsigned offset = n - makeflags;
+-	      char *dup = xstrdup (makeflags);
+-	      dup[offset] = '\0';
+-
+-	      const char *space = strchr (makeflags + offset, ' ');
+-	      if (space != NULL)
+-		strcpy (dup + offset, space);
+-	      xputenv (concat ("MAKEFLAGS=", dup, NULL));
+-	    }
+-	}
+-    }
++  jobserver_info jinfo;
++  if (!jinfo.is_active && !jinfo.skipped_makeflags.empty ())
++    xputenv (jinfo.skipped_makeflags.c_str ());
+ }
+ 
+ /* Determine what the exit code of the driver should be.  */
+--- a/gcc/lto-wrapper.c
++++ b/gcc/lto-wrapper.c
+@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
+    ./ccCJuXGv.lto.ltrans.o
+ */
+ 
++#define INCLUDE_STRING
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
+@@ -48,6 +49,8 @@ along with GCC; see the file COPYING3.  If not see
+ #include "simple-object.h"
+ #include "lto-section-names.h"
+ #include "collect-utils.h"
++#include "opts-diagnostic.h"
++#include "opts-jobserver.h"
+ 
+ /* Environment variable, used for passing the names of offload targets from GCC
+    driver to lto-wrapper.  */
+@@ -1295,32 +1298,43 @@ init_num_threads (void)
+ #endif
+ }
+ 
+-/* FIXME: once using -std=c++11, we can use std::thread::hardware_concurrency.  */
+-
+-/* Return true when a jobserver is running and can accept a job.  */
+-
+-static bool
+-jobserver_active_p (void)
++void
++print_lto_docs_link ()
+ {
+-  const char *makeflags = getenv ("MAKEFLAGS");
+-  if (makeflags == NULL)
+-    return false;
++  bool print_url = global_dc->printer->url_format != URL_FORMAT_NONE;
++  const char *url = global_dc->get_option_url (global_dc, OPT_flto);
+ 
+-  const char *needle = "--jobserver-auth=";
+-  const char *n = strstr (makeflags, needle);
+-  if (n == NULL)
+-    return false;
+-
+-  int rfd = -1;
+-  int wfd = -1;
+-
+-  return (sscanf (n + strlen (needle), "%d,%d", &rfd, &wfd) == 2
+-	  && rfd > 0
+-	  && wfd > 0
+-	  && is_valid_fd (rfd)
+-	  && is_valid_fd (wfd));
++  pretty_printer pp;
++  pp.url_format = URL_FORMAT_DEFAULT;
++  pp_string (&pp, "see the ");
++  if (print_url)
++    pp_begin_url (&pp, url);
++  pp_string (&pp, "%<-flto%> option documentation");
++  if (print_url)
++    pp_end_url (&pp);
++  pp_string (&pp, " for more information");
++  inform (UNKNOWN_LOCATION, pp_formatted_text (&pp));
+ }
+ 
++/* Test that a make command is present and working, return true if so.  */
++
++static bool
++make_exists (void)
++{
++  const char *make = "make";
++  char **make_argv = buildargv (getenv ("MAKE"));
++  if (make_argv)
++    make = make_argv[0];
++  const char *make_args[] = {make, "--version", NULL};
++
++  int exit_status = 0;
++  int err = 0;
++  const char *errmsg
++    = pex_one (PEX_SEARCH, make_args[0], CONST_CAST (char **, make_args),
++	       "make", NULL, NULL, &exit_status, &err);
++  freeargv (make_argv);
++  return errmsg == NULL && exit_status == 0 && err == 0;
++}
+ /* Execute gcc. ARGC is the number of arguments. ARGV contains the arguments. */
+ 
+ static void
+@@ -1535,10 +1549,20 @@ run_gcc (unsigned argc, char *argv[])
+       auto_parallel = 0;
+       parallel = 0;
+     }
+-  else if (!jobserver && jobserver_active_p ())
++  else
+     {
+-      parallel = 1;
+-      jobserver = 1;
++      jobserver_info jinfo;
++      if (jobserver && !jinfo.is_active)
++	{
++	  /* Fall back to auto parallelism.  */
++	  jobserver = 0;
++	  auto_parallel = 1;
++	}
++      else if (!jobserver && jinfo.is_active)
++	{
++	  parallel = 1;
++	  jobserver = 1;
++	}
+     }
+ 
+   if (linker_output)
+@@ -1861,6 +1885,20 @@ cont:
+       maybe_unlink (ltrans_output_file);
+       ltrans_output_file = NULL;
+ 
++      if (nr > 1)
++	{
++	  if (jobserver_requested && !jinfo.is_active)
++	    {
++	      warning (0, jinfo.error_msg.c_str ());
++	      print_lto_docs_link ();
++	    }
++	  else if (parallel == 0)
++	    {
++	      warning (0, "using serial compilation of %d LTRANS jobs", nr);
++	      print_lto_docs_link ();
++	    }
++	}
++
+       if (parallel)
+ 	{
+ 	  makefile = make_temp_file (".mk");
+--- a/gcc/opts-common.c
++++ b/gcc/opts-common.c
+@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
+ along with GCC; see the file COPYING3.  If not see
+ <http://www.gnu.org/licenses/>.  */
+ 
++#define INCLUDE_STRING
+ #include "config.h"
+ #include "system.h"
+ #include "intl.h"
+@@ -25,6 +26,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "options.h"
+ #include "diagnostic.h"
+ #include "spellcheck.h"
++#include "opts-jobserver.h"
+ 
+ static void prune_options (struct cl_decoded_option **, unsigned int *);
+ 
+@@ -1805,3 +1807,42 @@ void prepend_xassembler_to_collect_as_options (const char *collect_as_options,
+       obstack_1grow (o, '\'');
+     }
+ }
++
++jobserver_info::jobserver_info ()
++{
++  /* Detect jobserver and drop it if it's not working.  */
++  string js_needle = "--jobserver-auth=";
++
++  const char *envval = getenv ("MAKEFLAGS");
++  if (envval != NULL)
++    {
++      string makeflags = envval;
++      size_t n = makeflags.rfind (js_needle);
++      if (n != string::npos)
++	{
++	  if (sscanf (makeflags.c_str () + n + js_needle.size (),
++		      "%d,%d", &rfd, &wfd) == 2
++	      && rfd > 0
++	      && wfd > 0
++	      && is_valid_fd (rfd)
++	      && is_valid_fd (wfd))
++	    is_active = true;
++	  else
++	    {
++	      string dup = makeflags.substr (0, n);
++	      size_t pos = makeflags.find (' ', n);
++	      if (pos != string::npos)
++		dup += makeflags.substr (pos);
++	      skipped_makeflags = "MAKEFLAGS=" + dup;
++	      error_msg
++		= "cannot access %<" + js_needle + "%> file descriptors";
++	    }
++	}
++      error_msg = "%<" + js_needle + "%> is not present in %<MAKEFLAGS%>";
++    }
++  else
++    error_msg = "%<MAKEFLAGS%> environment variable is unset";
++
++  if (!error_msg.empty ())
++    error_msg = "jobserver is not available: " + error_msg;
++}
+--- /dev/null
++++ b/gcc/opts-jobserver.h
+@@ -0,0 +1,44 @@
++/* GNU make's jobserver related functionality.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify it under
++the terms of the GNU General Public License as published by the Free
++Software Foundation; either version 3, or (at your option) any later
++version.
++
++GCC is distributed in the hope that it will be useful, but WITHOUT ANY
++WARRANTY; without even the implied warranty of MERCHANTABILITY or
++FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.
++
++See dbgcnt.def for usage information.  */
++
++#ifndef GCC_JOBSERVER_H
++#define GCC_JOBSERVER_H
++
++using namespace std;
++
++struct jobserver_info
++{
++  /* Default constructor.  */
++  jobserver_info ();
++
++  /* Error message if there is a problem.  */
++  string error_msg = "";
++  /* Skipped MAKEFLAGS where --jobserver-auth is skipped.  */
++  string skipped_makeflags = "";
++  /* File descriptor for reading used for jobserver communication.  */
++  int rfd = -1;
++  /* File descriptor for writing used for jobserver communication.  */
++  int wfd = -1;
++  /* Return true if jobserver is active.  */
++  bool is_active = false;
++};
++
++#endif /* GCC_JOBSERVER_H */
+-- 
+2.38.1
