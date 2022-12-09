@@ -13,10 +13,6 @@ algorithm. xxhash is especially hevyweight as it's a
 
 Bug: https://gcc.gnu.org/PR87256
 Signed-off-by: Sergei Trofimovich <slyfox@gentoo.org>
----
- gcc/expmed.h | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
-
 --- a/gcc/expmed.h
 +++ b/gcc/expmed.h
 @@ -127,11 +127,14 @@ struct alg_hash_entry {

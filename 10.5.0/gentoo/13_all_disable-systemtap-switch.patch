@@ -13,13 +13,6 @@ discovery.
 Bug: https://bugs.gentoo.org/654748
 Bug: https://gcc.gnu.org/bugzilla/PR61257
 Signed-off-by: Sergei Trofimovich <slyfox@gentoo.org>
----
- gcc/configure    | 34 ++++++++++++++++++++++++++--------
- gcc/configure.ac | 30 ++++++++++++++++++++++--------
- 2 files changed, 48 insertions(+), 16 deletions(-)
-
-diff --git a/gcc/configure b/gcc/configure
-index 3dcf7752b..c2049f117 100755
 --- a/gcc/configure
 +++ b/gcc/configure
 @@ -988,6 +988,7 @@ enable_gnu_unique_object

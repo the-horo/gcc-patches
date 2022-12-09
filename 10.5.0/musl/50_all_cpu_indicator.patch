@@ -4,13 +4,6 @@ Date: Thu, 7 May 2020 21:14:11 -0500
 Subject: [PATCH] convert "__cpu_indicator_init" to
  "__cpu_indicator_init_local"
 
----
- gcc/config/i386/i386-expand.c | 4 ++--
- libgcc/config/i386/cpuinfo.c  | 6 +++---
- 2 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/gcc/config/i386/i386-expand.c b/gcc/config/i386/i386-expand.c
-index 48f00c5fc..78650b202 100644
 --- a/gcc/config/i386/i386-expand.c
 +++ b/gcc/config/i386/i386-expand.c
 @@ -10941,10 +10941,10 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
@@ -26,8 +19,6 @@ index 48f00c5fc..78650b202 100644
  	call_expr = build_call_expr (fndecl, 0); 
  	return expand_expr (call_expr, target, mode, EXPAND_NORMAL);
        }
-diff --git a/libgcc/config/i386/cpuinfo.c b/libgcc/config/i386/cpuinfo.c
-index 00322c586..f42bbb8af 100644
 --- a/libgcc/config/i386/cpuinfo.c
 +++ b/libgcc/config/i386/cpuinfo.c
 @@ -508,7 +508,7 @@ __cpu_indicator_init (void)

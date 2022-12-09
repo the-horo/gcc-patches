@@ -1,6 +1,5 @@
-diff -Naur gcc-9.3.0.orig/gcc/config/aarch64/t-aarch64-linux gcc-9.3.0/gcc/config/aarch64/t-aarch64-linux
---- gcc-9.3.0.orig/gcc/config/aarch64/t-aarch64-linux	2020-10-05 02:59:12.767988285 -0700
-+++ gcc-9.3.0/gcc/config/aarch64/t-aarch64-linux	2020-10-05 03:03:32.310816444 -0700
+--- a/gcc/config/aarch64/t-aarch64-linux
++++ b/gcc/config/aarch64/t-aarch64-linux
 @@ -22,7 +22,7 @@
  LIB1ASMFUNCS = _aarch64_sync_cache_range
  
@@ -10,9 +9,8 @@ diff -Naur gcc-9.3.0.orig/gcc/config/aarch64/t-aarch64-linux gcc-9.3.0/gcc/confi
  MULTIARCH_DIRNAME = $(call if_multiarch,aarch64$(AARCH_BE)-linux-gnu)
  
  MULTILIB_OSDIRNAMES += mabi.ilp32=../libilp32$(call if_multiarch,:aarch64$(AARCH_BE)-linux-gnu_ilp32)
-diff -Naur gcc-9.3.0.orig/gcc/config/i386/t-linux64 gcc-9.3.0/gcc/config/i386/t-linux64
---- gcc-9.3.0.orig/gcc/config/i386/t-linux64	2020-10-05 02:59:12.757989347 -0700
-+++ gcc-9.3.0/gcc/config/i386/t-linux64	2020-10-05 03:24:58.878825272 -0700
+--- a/gcc/config/i386/t-linux64
++++ b/gcc/config/i386/t-linux64
 @@ -33,6 +33,6 @@
  comma=,
  MULTILIB_OPTIONS    = $(subst $(comma),/,$(TM_MULTILIB_CONFIG))
@@ -23,9 +21,8 @@ diff -Naur gcc-9.3.0.orig/gcc/config/i386/t-linux64 gcc-9.3.0/gcc/config/i386/t-
 +MULTILIB_OSDIRNAMES = m64=../lib
 +MULTILIB_OSDIRNAMES+= m32=../lib32
 +MULTILIB_OSDIRNAMES+= mx32=../libx32
-diff -Naur gcc-9.3.0.orig/gcc/config/rs6000/t-linux gcc-9.3.0/gcc/config/rs6000/t-linux
---- gcc-9.3.0.orig/gcc/config/rs6000/t-linux	2020-10-05 02:59:12.767988285 -0700
-+++ gcc-9.3.0/gcc/config/rs6000/t-linux	2020-10-05 03:03:32.310816444 -0700
+--- a/gcc/config/rs6000/t-linux
++++ b/gcc/config/rs6000/t-linux
 @@ -2,7 +2,8 @@
  # or soft-float.
  ifeq (,$(filter $(with_cpu),$(SOFT_FLOAT_CPUS))$(findstring soft,$(with_float)))
@@ -46,9 +43,8 @@ diff -Naur gcc-9.3.0.orig/gcc/config/rs6000/t-linux gcc-9.3.0/gcc/config/rs6000/
  endif
  endif
  
-diff -Naur gcc-9.3.0.orig/gcc/config/rs6000/t-linux64 gcc-9.3.0/gcc/config/rs6000/t-linux64
---- gcc-9.3.0.orig/gcc/config/rs6000/t-linux64	2020-10-05 02:59:12.767988285 -0700
-+++ gcc-9.3.0/gcc/config/rs6000/t-linux64	2020-10-05 03:03:32.310816444 -0700
+--- a/gcc/config/rs6000/t-linux64
++++ b/gcc/config/rs6000/t-linux64
 @@ -28,8 +28,8 @@
  MULTILIB_OPTIONS    := m64/m32
  MULTILIB_DIRNAMES   := 64 32
@@ -60,9 +56,8 @@ diff -Naur gcc-9.3.0.orig/gcc/config/rs6000/t-linux64 gcc-9.3.0/gcc/config/rs600
  
  rs6000-linux.o: $(srcdir)/config/rs6000/rs6000-linux.c
  	$(COMPILE) $<
-diff -Naur gcc-9.3.0.orig/gcc/config/rs6000/t-linux64bele gcc-9.3.0/gcc/config/rs6000/t-linux64bele
---- gcc-9.3.0.orig/gcc/config/rs6000/t-linux64bele	2020-10-05 02:59:12.767988285 -0700
-+++ gcc-9.3.0/gcc/config/rs6000/t-linux64bele	2020-10-05 03:03:32.310816444 -0700
+--- a/gcc/config/rs6000/t-linux64bele
++++ b/gcc/config/rs6000/t-linux64bele
 @@ -2,6 +2,6 @@
  
  MULTILIB_OPTIONS    += mlittle
@@ -72,9 +67,8 @@ diff -Naur gcc-9.3.0.orig/gcc/config/rs6000/t-linux64bele gcc-9.3.0/gcc/config/r
 +MULTILIB_OSDIRNAMES = m64=../lib
 +MULTILIB_OSDIRNAMES+= m32=../lib32
  MULTILIB_MATCHES    := ${MULTILIB_MATCHES_ENDIAN}
-diff -Naur gcc-9.3.0.orig/gcc/config/rs6000/t-linux64lebe gcc-9.3.0/gcc/config/rs6000/t-linux64lebe
---- gcc-9.3.0.orig/gcc/config/rs6000/t-linux64lebe	2020-10-05 02:59:12.777987222 -0700
-+++ gcc-9.3.0/gcc/config/rs6000/t-linux64lebe	2020-10-05 03:03:32.310816444 -0700
+--- a/gcc/config/rs6000/t-linux64lebe
++++ b/gcc/config/rs6000/t-linux64lebe
 @@ -2,6 +2,6 @@
  
  MULTILIB_OPTIONS    += mbig
