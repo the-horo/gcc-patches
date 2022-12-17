@@ -1,7 +1,3 @@
-4		9 Dec 2022
-	+ 78_all_Factor-out-jobserver_active_p.patch
-	+ 79_all_lto-support-jobserver-style-fifo-for-recent-GNU-make.patch
-
 3		19 Nov 2022
 	+ 77_all_configure-c89.patch
 
