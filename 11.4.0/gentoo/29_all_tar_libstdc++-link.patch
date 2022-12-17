@@ -31,19 +31,22 @@ https://bugs.gentoo.org/843119
 Signed-off-by: Sam James <sam@gentoo.org>
 --- a/gcc/Makefile.in
 +++ b/gcc/Makefile.in
-@@ -3904,9 +3904,9 @@ install-headers-tar: stmp-int-hdrs install-include-dir
+@@ -3902,10 +3902,10 @@ install-headers-tar: stmp-int-hdrs install-include-dir
  # Unless a full pathname is provided, some shells would print the new CWD,
  # found in CDPATH, corrupting the output.  We could just redirect the
  # output of `cd', but some shells lose on redirection within `()'s
 -	(cd `${PWD_COMMAND}`/include ; \
-+	(unset LD_LIBRARY_PATH ; cd `${PWD_COMMAND}`/include ; \
- 	 tar -cf - .; exit 0) | (cd $(DESTDIR)$(libsubdir)/include; tar xpf - )
+-	 tar -cf - .; exit 0) | (cd $(DESTDIR)$(libsubdir)/include; tar xpf - )
 -	(cd `${PWD_COMMAND}`/include-fixed ; \
+-	 tar -cf - .; exit 0) | (cd $(DESTDIR)$(libsubdir)/include-fixed; tar xpf - )
++	(unset LD_LIBRARY_PATH ; cd `${PWD_COMMAND}`/include ; \
++	 tar -cf - .; exit 0) | (unset LD_LIBRARY_PATH ; cd $(DESTDIR)$(libsubdir)/include; tar xpf - )
 +	(unset LD_LIBRARY_PATH ; cd `${PWD_COMMAND}`/include-fixed ; \
- 	 tar -cf - .; exit 0) | (cd $(DESTDIR)$(libsubdir)/include-fixed; tar xpf - )
++	 tar -cf - .; exit 0) | (unset LD_LIBRARY_PATH ; cd $(DESTDIR)$(libsubdir)/include-fixed; tar xpf - )
  # /bin/sh on some systems returns the status of the first tar,
  # and that can lose with GNU tar which always writes a full block.
-@@ -3928,7 +3928,7 @@ install-headers-cp: stmp-int-hdrs install-include-dir
+ # So use `exit 0' to ignore its exit status.
+@@ -3926,7 +3926,7 @@ install-headers-cp: stmp-int-hdrs install-include-dir
  # Targets without dependencies, for use in prev-gcc during bootstrap.
  real-install-headers-tar:
  	(cd `${PWD_COMMAND}`/include-fixed ; \
