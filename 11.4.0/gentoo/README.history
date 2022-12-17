@@ -1,3 +1,6 @@
+4		17 Dec 2022
+	+ 35_all_tar_libstdc++-link.patch
+
 3		19 Nov 2022
 	+ 77_all_configure-c89.patch
 
