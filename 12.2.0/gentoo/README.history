@@ -1,3 +1,7 @@
+9		8 Jan 2022
+	- 76_all_libsanitizer-implicit-function-decls.patch
+	- 77_all_libiberty-fix-c89-isms-in-configure.patch
+
 8		28 Dec 2022
 	U 01_all_default-fortify-source.patch
 	+ 15_all_DEF_GENTOO_GLIBCXX_ASSERTIONS.patch
