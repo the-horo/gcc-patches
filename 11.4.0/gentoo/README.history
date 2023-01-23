@@ -1,5 +1,6 @@
-7		22 Jan 2022
+7		23 Jan 2022
 	- 26_all_enable-cet.patch
+	+ 77_all_driver_environ_putenv_PR106624.patch
 
 6		7 Jan 2022
 	- 77_all_configure-c89.patch
