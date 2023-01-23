@@ -1,3 +1,6 @@
+4		23 Jan 2022
+	+ 77_all_driver_environ_putenv_PR106624.patch
+
 3		17 Dec 2022
 	U 35_all_tar_libstdc++-link.patch
 
