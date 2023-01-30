@@ -1,3 +1,7 @@
+6	30 Jan 2023
+	U 01_all_default-fortify-source.patch
+	+ 15_all_DEF_GENTOO_GLIBCXX_ASSERTIONS.patch
+
 5	17 Dec 2022
 	U 30_all_tar_libstdc++-link.patch
 
