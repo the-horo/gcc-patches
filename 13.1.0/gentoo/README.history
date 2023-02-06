@@ -1,3 +1,6 @@
+7	6 Feb 2023
+	+ 75_all_all_PR107461_cxx_equivalence_non_dependent_calls.patch
+
 6	30 Jan 2023
 	U 01_all_default-fortify-source.patch
 	+ 15_all_DEF_GENTOO_GLIBCXX_ASSERTIONS.patch
