@@ -16,8 +16,8 @@ initially Gentoo used too complicated macro.
 +    #define GENTOO_FORTIFY_SOURCE_LEVEL 2
 +  #endif
 +
-+  /* Fortify Source enabled by default for optimization levels > 0 */
-+  if (optimize)
++  /* F_S enabled by default for optimization levels > 0, except for ASAN: https://github.com/google/sanitizers/issues/247 */
++  if (optimize && ! (flag_sanitize & SANITIZE_ADDRESS))
 +    builtin_define_with_int_value ("_FORTIFY_SOURCE", GENTOO_FORTIFY_SOURCE_LEVEL);
 +#endif
 +
