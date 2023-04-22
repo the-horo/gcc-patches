@@ -1,3 +1,6 @@
+15		22 Apr 2023
+	+ 76_all_all_PR109573_12_ICE-in-vectorizable_live_operation.patch
+
 14		13 Mar 2023
 	U 01_all_default-fortify-source.patch
 
