@@ -1,3 +1,8 @@
+2	29 Apr 2023
+	- 75_all_all_PR109573_13_ICE-in-vectorizable_live_operation.patch
+	- 76_all_all_PR109585_13_rtl-alias-analysis-typo.patch
+	- 77_all_all_PR109609_13_tail-call-fnspec.patch
+
 1	26 April 2023
 
 	+ 01_all_default-fortify-source.patch
