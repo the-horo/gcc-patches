@@ -1,3 +1,9 @@
+4	30 Jul 2023
+
+	U 31_all_gm2_make_P_var.patch
+	+ 82_all_arm64_PR110280_ICE_fold-const.patch
+	+ 83_all_all_PR110315_crash_large_std_vector.patch
+
 3	26 May 2023	
 
 	+ 76_all_match.pd-don-t-emit-label-if-not-needed.patch
