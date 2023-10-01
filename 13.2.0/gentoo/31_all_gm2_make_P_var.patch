@@ -12,33 +12,33 @@ r0-31149-gb8dad04b688e9c.
 
 gcc/m2/ChangeLog:
 
-	* Make-lang.in: Remove references to $(P).
-	* Make-maintainer.in: Ditto.
+       * Make-lang.in: Remove references to $(P).
+       * Make-maintainer.in: Ditto.
 
 (cherry picked from commit 79c73122fab213f218b85b2c579ffe3cf5e98ad0)
 --- a/gcc/m2/Make-lang.in
 +++ b/gcc/m2/Make-lang.in
-@@ -515,7 +515,7 @@ GM2_LIBS_BOOT     = m2/gm2-compiler-boot/gm2.a \
+@@ -532,7 +532,7 @@ m2_OBJS = $(GM2_C_OBJS) m2/gm2-gcc/rtegraph.o \
  cc1gm2$(exeext): m2/stage1/cc1gm2$(exeext) $(m2.prev)
  	cp -p $< $@
  
 -m2/stage2/cc1gm2$(exeext): m2/stage1/cc1gm2$(exeext) m2/gm2-compiler/m2flex.o $(P) \
 +m2/stage2/cc1gm2$(exeext): m2/stage1/cc1gm2$(exeext) m2/gm2-compiler/m2flex.o \
                              $(GM2_C_OBJS) $(BACKEND) $(LIBDEPS) $(GM2_LIBS) \
-                             m2/gm2-gcc/rtegraph.o plugin/m2rte$(soext)
+                             m2/gm2-gcc/rtegraph.o $(M2RTE_PLUGIN_SO)
  	-test -d $(@D) || $(mkinstalldirs) $(@D)
-@@ -528,7 +528,7 @@ m2/stage2/cc1gm2$(exeext): m2/stage1/cc1gm2$(exeext) m2/gm2-compiler/m2flex.o $(
+@@ -545,7 +545,7 @@ m2/stage2/cc1gm2$(exeext): m2/stage1/cc1gm2$(exeext) m2/gm2-compiler/m2flex.o $(
  	@$(call LINK_PROGRESS,$(INDEX.m2),end)
  
  m2/stage1/cc1gm2$(exeext): gm2$(exeext) m2/gm2-compiler-boot/m2flex.o \
 -                            $(P) $(GM2_C_OBJS) $(BACKEND) $(LIBDEPS) \
 +                            $(GM2_C_OBJS) $(BACKEND) $(LIBDEPS) \
                              $(GM2_LIBS_BOOT) $(MC_LIBS) \
-                             m2/gm2-gcc/rtegraph.o plugin/m2rte$(soext) \
+                             m2/gm2-gcc/rtegraph.o $(M2RTE_PLUGIN_SO) \
                              $(m2.prev)
 --- a/gcc/m2/Make-maintainer.in
 +++ b/gcc/m2/Make-maintainer.in
-@@ -848,7 +848,7 @@ GM2_LIBS_PARANOID = m2/gm2-compiler-paranoid/gm2.a \
+@@ -852,7 +852,7 @@ GM2_LIBS_PARANOID = m2/gm2-compiler-paranoid/gm2.a \
  gm2.paranoid: m2/m2obj3/cc1gm2$(exeext) gm2.verifyparanoid
  
  m2/m2obj3/cc1gm2$(exeext): m2/m2obj2/cc1gm2$(exeext) m2/gm2-compiler-paranoid/m2flex.o \
@@ -47,5 +47,3 @@ gcc/m2/ChangeLog:
                              m2/gm2-gcc/rtegraph.o plugin/m2rte$(exeext).so
  	-test -d m2/m2obj3 || $(mkinstalldirs) m2/m2obj3
  	@$(call LINK_PROGRESS,$(INDEX.m2),start)
--- 
-2.41.0
