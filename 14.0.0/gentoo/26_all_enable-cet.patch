@@ -18,7 +18,7 @@ Only supported on amd64.
 -      "  %(cc1_options) %2"
 +      "  %(cc1_options) %(default_flag_cf_spec) %2"
        "  %{!fsyntax-only:"
-       "    %{!S:-o %g.s%V}"
+       "    %{!S:-o %g.s}"
        "    %{!fmodule-*:%{!fmodules-*:%{!fdump-ada-spec*:"
 @@ -72,7 +72,7 @@ along with GCC; see the file COPYING3.  If not see
        "  %{!save-temps*:%{!no-integrated-cpp:%(cpp_unique_options)}}"
@@ -27,7 +27,7 @@ Only supported on amd64.
 -      "  %(cc1_options) %2"
 +      "  %(cc1_options) %(default_flag_cf_spec) %2"
        "  %{!fsyntax-only:"
-       "    %{!S:-o %g.s%V}"
+       "    %{!S:-o %g.s}"
        "    %{!fmodule-*:%{!fmodules-*:%{!fdump-ada-spec*:"
 @@ -92,7 +92,7 @@ along with GCC; see the file COPYING3.  If not see
        " 	   %{save-temps*:%b.ii} %{!save-temps*:%g.ii}}"
@@ -36,7 +36,7 @@ Only supported on amd64.
 -      "  %(cc1_options) %2"
 +      "  %(cc1_options) %(default_flag_cf_spec) %2"
        "  %{!fsyntax-only:"
-       "    %{!S:-o %g.s%V}"
+       "    %{!S:-o %g.s}"
        "    %{!fmodule-*:%{!fmodules-*:%{!fdump-ada-spec*:"
 @@ -107,7 +107,7 @@ along with GCC; see the file COPYING3.  If not see
        "  cc1plus %{save-temps*|no-integrated-cpp:-fpreprocessed"
@@ -58,7 +58,7 @@ Only supported on amd64.
        "    %{!fmodule-only:%{!fmodule-header*:%(invoke_as)}}}"
 --- a/gcc/gcc.cc
 +++ b/gcc/gcc.cc
-@@ -994,6 +994,18 @@ proper position among the other output files.  */
+@@ -999,6 +999,18 @@ proper position among the other output files.  */
  #define LINK_NOW_SPEC ""
  #endif
  
@@ -77,7 +77,7 @@ Only supported on amd64.
  #ifdef ENABLE_DEFAULT_PIE
  #define PIE_SPEC		"!no-pie"
  #define NO_FPIE1_SPEC		"fno-pie"
-@@ -1196,6 +1208,7 @@ static const char *cpp_spec = CPP_SPEC;
+@@ -1201,6 +1213,7 @@ static const char *cpp_spec = CPP_SPEC;
  static const char *cc1_spec = CC1_SPEC OS_CC1_SPEC;
  static const char *cc1plus_spec = CC1PLUS_SPEC;
  static const char *link_gcc_c_sequence_spec = LINK_GCC_C_SEQUENCE_SPEC;
@@ -85,7 +85,7 @@ Only supported on amd64.
  static const char *link_ssp_spec = LINK_SSP_SPEC;
  static const char *asm_spec = ASM_SPEC;
  static const char *asm_final_spec = ASM_FINAL_SPEC;
-@@ -1254,7 +1267,7 @@ static const char *cpp_options =
+@@ -1261,7 +1274,7 @@ static const char *cpp_options =
  "%(cpp_unique_options) %1 %{m*} %{std*&ansi&trigraphs} %{W*&pedantic*} %{w}\
   %{f*} %{g*:%{%:debug-level-gt(0):%{g*}\
   %{!fno-working-directory:-fworking-directory}}} %{O*}\
@@ -94,7 +94,7 @@ Only supported on amd64.
  
  /* Pass -d* flags, possibly modifying -dumpdir, -dumpbase et al.
  
-@@ -1448,9 +1461,9 @@ static const struct compiler default_compilers[] =
+@@ -1455,9 +1468,9 @@ static const struct compiler default_compilers[] =
        %{save-temps*|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) \
  	  %(cpp_options) -o %{save-temps*:%b.i} %{!save-temps*:%g.i} \n\
  	    cc1 -fpreprocessed %{save-temps*:%b.i} %{!save-temps*:%g.i} \
@@ -106,8 +106,8 @@ Only supported on amd64.
        %{!fsyntax-only:%(invoke_as)}}}}", 0, 0, 1},
    {"-",
     "%{!E:%e-E or -x required when input is from standard input}\
-@@ -1475,7 +1488,7 @@ static const struct compiler default_compilers[] =
- 					   %W{o*:--output-pch %*}}%V}}}}}}}", 0, 0, 0},
+@@ -1482,7 +1495,7 @@ static const struct compiler default_compilers[] =
+ 					   %W{o*:--output-pch %w%*}}%{!S:%V}}}}}}}}", 0, 0, 0},
    {".i", "@cpp-output", 0, 0, 0},
    {"@cpp-output",
 -   "%{!M:%{!MM:%{!E:cc1 -fpreprocessed %i %(cc1_options) %{!fsyntax-only:%(invoke_as)}}}}", 0, 0, 0},
@@ -115,7 +115,7 @@ Only supported on amd64.
    {".s", "@assembler", 0, 0, 0},
    {"@assembler",
     "%{!M:%{!MM:%{!E:%{!S:as %(asm_debug) %(asm_options) %i %A }}}}", 0, 0, 0},
-@@ -1707,6 +1720,7 @@ static struct spec_list static_specs[] =
+@@ -1714,6 +1727,7 @@ static struct spec_list static_specs[] =
    INIT_STATIC_SPEC ("cc1_options",		&cc1_options),
    INIT_STATIC_SPEC ("cc1plus",			&cc1plus_spec),
    INIT_STATIC_SPEC ("link_gcc_c_sequence",	&link_gcc_c_sequence_spec),
