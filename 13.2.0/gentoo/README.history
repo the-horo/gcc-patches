@@ -1,3 +1,11 @@
+9	16 Oct 2023
+
+	+ 86_all_build-Replace-seq-for-portability-with-GNU-Make-vari.patch
+	+ 87_all_Remove-DEFAULT_MATCHPD_PARTITIONS-macro.patch
+	+ 88_all_Makefile.in-Make-TM_P_H-depend-on-TREE_H-PR111021.patch
+	+ 89_all_Makefile.in-Make-recog.h-depend-on-TREE_H-PR111021.patch
+	+ 90_all_PR54179_genemit-Split-insn-emit.cc-into-ten-files.patch
+
 8	1 Oct 2023
 
 	U 31_all_gm2_make_P_var.patch
