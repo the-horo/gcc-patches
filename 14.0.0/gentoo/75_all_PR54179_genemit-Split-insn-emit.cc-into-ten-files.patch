@@ -1,111 +1,13 @@
-https://gcc.gnu.org/PR54179
-https://inbox.sourceware.org/gcc-patches/de0f7bdc-d236-4f5b-9504-d5bfb215d023@gmail.com/
-
-From mboxrd@z Thu Jan  1 00:00:00 1970
-Return-Path: <SRS0=V+kJ=F6=gmail.com=rdapp.gcc@sourceware.org>
-Received: from mail-wr1-x435.google.com (mail-wr1-x435.google.com [IPv6:2a00:1450:4864:20::435])
-	by sourceware.org (Postfix) with ESMTPS id 494063858D33
-	for <gcc-patches@gcc.gnu.org>; Mon, 16 Oct 2023 10:17:21 +0000 (GMT)
-DMARC-Filter: OpenDMARC Filter v1.4.2 sourceware.org 494063858D33
-Authentication-Results: sourceware.org; dmarc=pass (p=none dis=none) header.from=gmail.com
-Authentication-Results: sourceware.org; spf=pass smtp.mailfrom=gmail.com
-ARC-Filter: OpenARC Filter v1.0.0 sourceware.org 494063858D33
-Authentication-Results: server2.sourceware.org; arc=none smtp.remote-ip=2a00:1450:4864:20::435
-ARC-Seal: i=1; a=rsa-sha256; d=sourceware.org; s=key; t=1697451446; cv=none;
-	b=p7qdXp6tA02vcm8FYp8Z94RsTNBTMF12iWlVcXVLWFaSW8HGwwCYhMGYoGFaifZQRu4UKyuAB+IzEF6a/yAg4YIoSatzLygSXd8C4Y5pTzNOedtsXKySOf2H5tU0JllZhFiL0j839yK0ULkru902Fm5qYfCWOI/oclFGFv0QJhk=
-ARC-Message-Signature: i=1; a=rsa-sha256; d=sourceware.org; s=key;
-	t=1697451446; c=relaxed/simple;
-	bh=F5nvjfODgAkwvN6oz045m/y2cCq1Y5w/bjL6/Zx7/us=;
-	h=DKIM-Signature:Message-ID:Date:MIME-Version:Subject:To:From; b=Irn6EDwgJ++gSjzeSooV3KQnHee12GYc2RQmTDoYZo/FSdddOhiPTfdaC7P29HmOXa4CPBOS8Yv9BTZMwm6YLK9J2wCQws5N76sMTuINsJ4seyvCF4hUO/2icjNn/K1NCpiAh/hGfqdO7ASiqbVBoFfgM7fwtCOYLKF6sIY1lyM=
-ARC-Authentication-Results: i=1; server2.sourceware.org
-Received: by mail-wr1-x435.google.com with SMTP id ffacd0b85a97d-32d834ec222so4107319f8f.0
-        for <gcc-patches@gcc.gnu.org>; Mon, 16 Oct 2023 03:17:21 -0700 (PDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20230601; t=1697451440; x=1698056240; darn=gcc.gnu.org;
-        h=content-transfer-encoding:in-reply-to:from:references:to
-         :content-language:subject:cc:user-agent:mime-version:date:message-id
-         :from:to:cc:subject:date:message-id:reply-to;
-        bh=wq5w+s2m/P53eb5oT6XaK+NiaOj7NqTTS7VH5l0hPUk=;
-        b=ir8fQ9LhX/rsjkKQE99tm5M/K+iNNIYZ/1cdZ5bz4WDndMrk52oidsfzruyMfSbRhB
-         rHSI1uSAzTr3Hp0f3ugYQInO3KFgdrvSiZ1sUhIcSA9SG7fCECczgD7GcW6OZn6F8c9u
-         XbFgqbWLIFtqXeKsmQs+CY2nS4KS/CRT9eoUafES8rZNYXDOe9QVbHjblx7rtXWO2HXQ
-         lmfzqTktf3I7JxtYpl0r0MYMcjSfcq0DOuL80NWyMDlBWOQT3IBAdyulrLAEW+jH/Z8p
-         xQ15SULgu0m2yiv/KGWXTkZfr7tvRGnSmmdtRRH0FCoXSf8jg/zHFTkl/j+SzlSzDwGs
-         c1qg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1697451440; x=1698056240;
-        h=content-transfer-encoding:in-reply-to:from:references:to
-         :content-language:subject:cc:user-agent:mime-version:date:message-id
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
-        bh=wq5w+s2m/P53eb5oT6XaK+NiaOj7NqTTS7VH5l0hPUk=;
-        b=kKfXLuOWBPVcAyFOUh31XizZ+aCfxMvezPMmblFS/UpzD2W/C0uFKwEGnChfefXi2/
-         +bzYReU5vtLu8pAloncEatu5L4GV1u+WdTSbW1T5xIy+5oMx++9PpyY4AE247J0yd86k
-         1y7iJTKapjRfltZuFYEXFXtk+EUb6KM8JtlwJvoxl1WA5eUMF3QS7mrB/a4aM4x6i+Eg
-         YlOoTXYO0bLGOCdeXOLJfjDEkck1ELrHj2LtlRHyrlB9cfOgf17T6ndeeHGFfXNQHPZ9
-         6ozlhvhckpJQgI9lmwx9y62sUeq7EvLbrq6iRQm/urmU7ONjSXtvH9MhuU6vUBxvHZ7m
-         L7/Q==
-X-Gm-Message-State: AOJu0Yx8eFwSIp03QtdxQpmlUlQqKK5PYRJxvpOd/sAQ1a6DUl745e7C
-	/BMIbVYdWvfmdTlOA4Fq7wwu2tV7IwY=
-X-Google-Smtp-Source: AGHT+IHxbooDFrEU9aYJYA4rfQo2Hg5vBRYXtzpX5blf0iOYdzDMzsRxuyqHl6Jlfcy9/43ovuJMnQ==
-X-Received: by 2002:a5d:4402:0:b0:32d:8907:2b18 with SMTP id z2-20020a5d4402000000b0032d89072b18mr12076090wrq.66.1697451439584;
-        Mon, 16 Oct 2023 03:17:19 -0700 (PDT)
-Received: from [192.168.1.23] (ip-046-223-203-173.um13.pools.vodafone-ip.de. [46.223.203.173])
-        by smtp.gmail.com with ESMTPSA id e10-20020a5d65ca000000b0032da6f17ffdsm4983379wrw.38.2023.10.16.03.17.18
-        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
-        Mon, 16 Oct 2023 03:17:19 -0700 (PDT)
-Message-ID: <0867077f-12ac-4a89-8745-440cc782fe5b@gmail.com>
-Date: Mon, 16 Oct 2023 12:17:07 +0200
-MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Cc: rdapp.gcc@gmail.com, jeffreyalaw <jeffreyalaw@gmail.com>,
- "rjiejie@linux.alibaba.com" <rjiejie@linux.alibaba.com>
-Subject: Re: [PATCH] genemit: Split insn-emit.cc into ten files.
-Content-Language: en-US
-To: Tamar Christina <Tamar.Christina@arm.com>,
- gcc-patches <gcc-patches@gcc.gnu.org>
-References: <de0f7bdc-d236-4f5b-9504-d5bfb215d023@gmail.com>
- <be6174c7-820c-45b2-abb6-177c0701e3f5@gmail.com>
- <VI1PR08MB53258DF11D842AD7BBDA7434FFD2A@VI1PR08MB5325.eurprd08.prod.outlook.com>
- <37f1c7f7-411e-46de-8d68-a1e21ff440ae@gmail.com>
+From 544943ea6b4d0e9a57408ca92464e22b84ffcb12 Mon Sep 17 00:00:00 2001
 From: Robin Dapp <rdapp.gcc@gmail.com>
-In-Reply-To: <37f1c7f7-411e-46de-8d68-a1e21ff440ae@gmail.com>
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 7bit
-X-Spam-Status: No, score=-9.2 required=5.0 tests=BAYES_00,DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU,DKIM_VALID_EF,FREEMAIL_FROM,GIT_PATCH_0,RCVD_IN_DNSWL_NONE,SPF_HELO_NONE,SPF_PASS,TXREP autolearn=ham autolearn_force=no version=3.4.6
-X-Spam-Checker-Version: SpamAssassin 3.4.6 (2021-04-09) on server2.sourceware.org
-List-Id: <gcc-patches.gcc.gnu.org>
-
-Hi,
-
-the attached v2 includes Tamar's suggestion of keeping the current
-stdout behavior.  When no output files are passed (via -O) the output
-is written to stdout as before.
-
-Tamar also mentioned off-list that, similar to match.pd, it might make
-sense to balance the partitions in a better way than a fixed number
-of patterns threshold.  That's a good idea but I'd rather do that
-separately as the current approach already helps considerably.
-
-Attached v2 was bootstrapped and regtested on power10, aarch64 and
-x86 are still running.
-Stefan also tested v1 on s390 where the partitioning does not help
-but also doesn't slow anything down.  insn-emit.cc isn't very large
-to begin with on s390.
-
-Regards
- Robin
-
->From 34d05113a4e3c7e83a4731020307e26c1144af69 Mon Sep 17 00:00:00 2001
-From: Robin Dapp <rdapp@ventanamicro.com>
-Date: Thu, 12 Oct 2023 11:23:26 +0200
-Subject: [PATCH v2] genemit: Split insn-emit.cc into several partitions.
+Date: Fri, 20 Oct 2023 13:27:41 +0200
+Subject: [PATCH] genemit: Split insn-emit.cc into several partitions.
 
 On riscv insn-emit.cc has grown to over 1.2 mio lines of code and
 compiling it takes considerable time.
 Therefore, this patch adjust genemit to create several partitions
-(insn-emit-1.cc to insn-emit-n.cc).  In order to do so it first counts
-the number of available patterns, calculates the number of patterns per
-file and starts a new file whenever that number is reached.
+(insn-emit-1.cc to insn-emit-n.cc).  The available patterns are
+written to the given files in a sequential fashion.
 
 Similar to match.pd a configure option --with-emitinsn-partitions=num
 is introduced that makes the number of partition configurable.
@@ -142,7 +44,7 @@ gcc/ChangeLog:
 	* read-md.cc (md_reader::print_md_ptr_loc): Add file argument.
 	* read-md.h (class md_reader): Change definition.
 ---
- gcc/Makefile.in   |  38 +++-
+ gcc/Makefile.in   |  36 +++-
  gcc/configure     |  24 ++-
  gcc/configure.ac  |  13 ++
  gcc/genemit.cc    | 536 +++++++++++++++++++++++++---------------------
@@ -150,10 +52,10 @@ gcc/ChangeLog:
  gcc/gensupport.h  |   1 +
  gcc/read-md.cc    |   4 +-
  gcc/read-md.h     |   2 +-
- 8 files changed, 399 insertions(+), 255 deletions(-)
+ 8 files changed, 397 insertions(+), 255 deletions(-)
 
 diff --git a/gcc/Makefile.in b/gcc/Makefile.in
-index 9cc16268abf..ca0a616f768 100644
+index a25a1e32fbc..dc63c67409b 100644
 --- a/gcc/Makefile.in
 +++ b/gcc/Makefile.in
 @@ -236,6 +236,13 @@ GIMPLE_MATCH_PD_SEQ_O = $(patsubst %, gimple-match-%.o, $(MATCH_SPLITS_SEQ))
@@ -179,7 +81,7 @@ index 9cc16268abf..ca0a616f768 100644
  	insn-extract.o \
  	insn-latencytab.o \
  	insn-modes.o \
-@@ -1852,7 +1859,8 @@ TREECHECKING = @TREECHECKING@
+@@ -1854,7 +1861,8 @@ TREECHECKING = @TREECHECKING@
  FULL_DRIVER_NAME=$(target_noncanonical)-gcc-$(version)$(exeext)
  
  MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
@@ -189,7 +91,7 @@ index 9cc16268abf..ca0a616f768 100644
   insn-attr.h insn-attr-common.h insn-attrtab.cc insn-dfatab.cc \
   insn-latencytab.cc insn-opinit.cc insn-opinit.h insn-preds.cc insn-constants.h \
   tm-preds.h tm-constrs.h checksum-options $(GIMPLE_MATCH_PD_SEQ_SRC) \
-@@ -2481,11 +2489,11 @@ $(common_out_object_file): $(common_out_file)
+@@ -2483,11 +2491,11 @@ $(common_out_object_file): $(common_out_file)
  # and compile them.
  
  .PRECIOUS: insn-config.h insn-flags.h insn-codes.h insn-constants.h \
@@ -206,7 +108,7 @@ index 9cc16268abf..ca0a616f768 100644
  
  # Dependencies for the md file.  The first time through, we just assume
  # the md file itself and the generated dependency file (in order to get
-@@ -2508,7 +2516,7 @@ s-mddeps: $(md_file) $(MD_INCLUDES) build/genmddeps$(build_exeext)
+@@ -2510,7 +2518,7 @@ s-mddeps: $(md_file) $(MD_INCLUDES) build/genmddeps$(build_exeext)
  simple_rtl_generated_h	= insn-attr.h insn-attr-common.h insn-codes.h \
  			  insn-config.h insn-flags.h insn-target-def.h
  
@@ -215,31 +117,29 @@ index 9cc16268abf..ca0a616f768 100644
  			  insn-extract.cc insn-output.cc \
  			  insn-peep.cc insn-recog.cc
  
-@@ -2537,8 +2545,22 @@ $(simple_generated_c:insn-%.cc=s-%): s-%: build/gen%$(build_exeext)
+@@ -2539,8 +2547,20 @@ $(simple_generated_c:insn-%.cc=s-%): s-%: build/gen%$(build_exeext)
  	$(SHELL) $(srcdir)/../move-if-change tmp-$*.cc insn-$*.cc
  	$(STAMP) s-$*
  
 +# genemit splits its output into different files and doesn't write to
 +# stdout. (but rather to tmp-emit-01.cc..tmp-emit-10.cc)
-+s-tmp-emit: build/genemit$(build_exeext) insn-conditions.md
++$(INSNEMIT_SEQ_SRC): s-tmp-emit; @true
++s-tmp-emit: build/genemit$(build_exeext) $(MD_DEPS) insn-conditions.md
 +	$(RUN_GEN) build/genemit$(build_exeext) $(md_file) insn-conditions.md \
 +	  $(addprefix -O,${INSNEMIT_SEQ_TMP})
++	$(foreach id, $(INSNEMIT_SPLITS_SEQ), \
++	  $(SHELL) $(srcdir)/../move-if-change tmp-emit-$(id).cc \
++	  insn-emit-$(id).cc;)
 +	$(STAMP) s-tmp-emit
-+
-+$(INSNEMIT_SEQ_SRC): insn-emit-%.cc: s-insn-emit-%; @true
-+$(INSNEMIT_SEQ_SRC:insn-emit-%.cc=s-insn-emit-%): s-insn-emit-%: s-tmp-emit
-+	$(SHELL) $(srcdir)/../move-if-change tmp-emit-$*.cc insn-emit-$*.cc
-+	$(STAMP) s-insn-emit-$*
 +
  # gencheck doesn't read the machine description, and the file produced
  # doesn't use the insn-* convention.
 +
-+# --> s-check has prerequisite tree-check.h (though nothing to do)
  tree-check.h: s-check ; @true
  s-check : build/gencheck$(build_exeext)
  	$(RUN_GEN) build/gencheck$(build_exeext) > tmp-check.h
 diff --git a/gcc/configure b/gcc/configure
-index c43bde8174b..00672b18f72 100755
+index 9f5b7081992..cf35b8fac89 100755
 --- a/gcc/configure
 +++ b/gcc/configure
 @@ -842,6 +842,7 @@ enable_gcov
@@ -309,7 +209,7 @@ index c43bde8174b..00672b18f72 100755
  
  #if HAVE_DLFCN_H
 diff --git a/gcc/configure.ac b/gcc/configure.ac
-index fb8e32f8ee5..bc0ef734e6c 100644
+index c10e007f9bf..eac2cadab00 100644
 --- a/gcc/configure.ac
 +++ b/gcc/configure.ac
 @@ -956,6 +956,19 @@ fi
@@ -1447,7 +1347,5 @@ index b309c9c3deb..2adcb58478f 100644
    struct enum_type *lookup_enum_type (const char *name);
    void traverse_enum_types (htab_trav callback, void *info);
 -- 
-2.41.0
-
-
+2.42.0
 
