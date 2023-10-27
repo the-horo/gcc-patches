@@ -1,10 +1,36 @@
 https://gcc.gnu.org/PR54179
 https://inbox.sourceware.org/gcc-patches/de0f7bdc-d236-4f5b-9504-d5bfb215d023@gmail.com/
 
-From 544943ea6b4d0e9a57408ca92464e22b84ffcb12 Mon Sep 17 00:00:00 2001
+From a3804c98c5f73c02b3732b06a15dc4a397e60dad Mon Sep 17 00:00:00 2001
 From: Robin Dapp <rdapp.gcc@gmail.com>
-Date: Fri, 20 Oct 2023 13:27:41 +0200
-Subject: [PATCH] genemit: Split insn-emit.cc into several partitions.
+Date: Fri, 27 Oct 2023 21:04:25 +0200
+Subject: [PATCH] genemit: Split insn-emit.cc into ten files.
+
+After working with Sam off-list (thanks) I managed to get hppa to
+build.  Initially it looked as if hppa just had a very small number of
+instruction patterns so we wouldn't generate all 10 output files.
+However, the actual issue (which we will only hit with a low
+pattern count) was with counting all the patterns vs only counting
+the patterns that will be output.  A wrong pattern count lead to
+prematurely stopping to write output files.
+
+With that corrected, hppa "just works" until I hit linker errors
+due to relocations - most likely unrelated:
+
+bin/ld: unwind-dw2-fde-dip_s.o(.data.rel.ro+0): cannot handle
+R_PARISC_FPTR64 for __pthread_key_create@@GLIBC_2.34
+
+Attached is v3 that has been bootstrapped and tested on x86 and power10,
+aarch64 bootstrap was ok, testsuite is still running.  A riscv build and
+testsuite run was successful as well.
+
+Regards
+ Robin
+
+>From 248744c328440bff9cc339d2bf622852cbaac343 Mon Sep 17 00:00:00 2001
+From: Robin Dapp <rdapp@ventanamicro.com>
+Date: Thu, 12 Oct 2023 11:23:26 +0200
+Subject: [PATCH v3] genemit: Split insn-emit.cc into several partitions.
 
 On riscv insn-emit.cc has grown to over 1.2 mio lines of code and
 compiling it takes considerable time.
@@ -46,6 +72,19 @@ gcc/ChangeLog:
 	* gensupport.h (count_patterns): Define.
 	* read-md.cc (md_reader::print_md_ptr_loc): Add file argument.
 	* read-md.h (class md_reader): Change definition.
+---
+ gcc/Makefile.in   |  36 ++-
+ gcc/configure     |  24 +-
+ gcc/configure.ac  |  13 ++
+ gcc/genemit.cc    | 542 +++++++++++++++++++++++++---------------------
+ gcc/gensupport.cc |  55 +++++
+ gcc/gensupport.h  |   1 +
+ gcc/read-md.cc    |   4 +-
+ gcc/read-md.h     |   2 +-
+ 8 files changed, 422 insertions(+), 255 deletions(-)
+
+diff --git a/gcc/Makefile.in b/gcc/Makefile.in
+index 91d6bfbea4d0..d8bfad8de154 100644
 --- a/gcc/Makefile.in
 +++ b/gcc/Makefile.in
 @@ -236,6 +236,13 @@ GIMPLE_MATCH_PD_SEQ_O = $(patsubst %, gimple-match-%.o, $(MATCH_SPLITS_SEQ))
@@ -71,7 +110,7 @@ gcc/ChangeLog:
  	insn-extract.o \
  	insn-latencytab.o \
  	insn-modes.o \
-@@ -1856,7 +1863,8 @@ TREECHECKING = @TREECHECKING@
+@@ -1857,7 +1864,8 @@ TREECHECKING = @TREECHECKING@
  FULL_DRIVER_NAME=$(target_noncanonical)-gcc-$(version)$(exeext)
  
  MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
@@ -81,7 +120,7 @@ gcc/ChangeLog:
   insn-attr.h insn-attr-common.h insn-attrtab.cc insn-dfatab.cc \
   insn-latencytab.cc insn-opinit.cc insn-opinit.h insn-preds.cc insn-constants.h \
   tm-preds.h tm-constrs.h checksum-options $(GIMPLE_MATCH_PD_SEQ_SRC) \
-@@ -2488,11 +2496,11 @@ $(common_out_object_file): $(common_out_file)
+@@ -2489,11 +2497,11 @@ $(common_out_object_file): $(common_out_file)
  # and compile them.
  
  .PRECIOUS: insn-config.h insn-flags.h insn-codes.h insn-constants.h \
@@ -98,7 +137,7 @@ gcc/ChangeLog:
  
  # Dependencies for the md file.  The first time through, we just assume
  # the md file itself and the generated dependency file (in order to get
-@@ -2515,7 +2523,7 @@ s-mddeps: $(md_file) $(MD_INCLUDES) build/genmddeps$(build_exeext)
+@@ -2516,7 +2524,7 @@ s-mddeps: $(md_file) $(MD_INCLUDES) build/genmddeps$(build_exeext)
  simple_rtl_generated_h	= insn-attr.h insn-attr-common.h insn-codes.h \
  			  insn-config.h insn-flags.h insn-target-def.h
  
@@ -107,7 +146,7 @@ gcc/ChangeLog:
  			  insn-extract.cc insn-output.cc \
  			  insn-peep.cc insn-recog.cc
  
-@@ -2544,8 +2552,20 @@ $(simple_generated_c:insn-%.cc=s-%): s-%: build/gen%$(build_exeext)
+@@ -2545,8 +2553,20 @@ $(simple_generated_c:insn-%.cc=s-%): s-%: build/gen%$(build_exeext)
  	$(SHELL) $(srcdir)/../move-if-change tmp-$*.cc insn-$*.cc
  	$(STAMP) s-$*
  
@@ -129,7 +168,7 @@ gcc/ChangeLog:
  s-check : build/gencheck$(build_exeext)
  	$(RUN_GEN) build/gencheck$(build_exeext) > tmp-check.h
 diff --git a/gcc/configure b/gcc/configure
-index c47a8c5..0e4e0e4 100755
+index 77f33ee4df6f..d4ad988000f0 100755
 --- a/gcc/configure
 +++ b/gcc/configure
 @@ -844,6 +844,7 @@ enable_gcov
@@ -158,7 +197,7 @@ index c47a8c5..0e4e0e4 100755
    --with-dwarf2           force the default debug format to be DWARF 2 (or
                            later)
    --with-specs=SPECS      add SPECS to driver command-line processing
-@@ -7941,6 +7946,21 @@ fi
+@@ -7948,6 +7953,21 @@ fi
  
  
  
@@ -180,11 +219,29 @@ index c47a8c5..0e4e0e4 100755
  # Enable __cxa_atexit for C++.
  # Check whether --enable-__cxa_atexit was given.
  if test "${enable___cxa_atexit+set}" = set; then :
+@@ -19980,7 +20000,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 19983 "configure"
++#line 19995 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -20086,7 +20106,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 20089 "configure"
++#line 20101 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
 diff --git a/gcc/configure.ac b/gcc/configure.ac
-index b443da5..d4a6fff 100644
+index 10982cdfc099..dc8cb6a33de2 100644
 --- a/gcc/configure.ac
 +++ b/gcc/configure.ac
-@@ -949,6 +949,19 @@ fi
+@@ -956,6 +956,19 @@ fi
  
  AC_SUBST(DEFAULT_MATCHPD_PARTITIONS)
  
@@ -205,7 +262,7 @@ index b443da5..d4a6fff 100644
  AC_ARG_ENABLE(__cxa_atexit,
  [AS_HELP_STRING([--enable-__cxa_atexit], [enable __cxa_atexit for C++])],
 diff --git a/gcc/genemit.cc b/gcc/genemit.cc
-index 1ce0564..8d8a3c4 100644
+index 1ce0564076d8..471fd46a10b4 100644
 --- a/gcc/genemit.cc
 +++ b/gcc/genemit.cc
 @@ -49,29 +49,29 @@ struct clobber_ent
@@ -1083,7 +1140,7 @@ index 1ce0564..8d8a3c4 100644
      return (FATAL_EXIT_CODE);
  
  #define DEF_INTERNAL_OPTAB_FN(NAME, FLAGS, OPTAB, TYPE) \
-@@ -868,86 +925,81 @@ main (int argc, const char **argv)
+@@ -868,86 +925,87 @@ main (int argc, const char **argv)
    /* Assign sequential codes to all entries in the machine description
       in parallel with the tables in insn-output.cc.  */
  
@@ -1091,6 +1148,13 @@ index 1ce0564..8d8a3c4 100644
 -from the machine description file `md'.  */\n\n");
 +  int npatterns = count_patterns ();
 +  md_rtx_info info;
++
++  bool to_stdout = false;
++  int npatterns_per_file = npatterns;
++  if (!output_files.is_empty ())
++    npatterns_per_file = npatterns / output_files.length () + 1;
++  else
++    to_stdout = true;
  
 -  printf ("#define IN_TARGET_CODE 1\n");
 -  printf ("#include \"config.h\"\n");
@@ -1127,17 +1191,13 @@ index 1ce0564..8d8a3c4 100644
 -  printf ("#include \"tm-constrs.h\"\n");
 -  printf ("#include \"ggc.h\"\n");
 -  printf ("#include \"target.h\"\n\n");
-+  int npatterns_per_file = npatterns;
-+  if (!output_files.is_empty ())
-+    npatterns_per_file = npatterns / output_files.length () + 1;
- 
--  /* Read the machine description.  */
 +  gcc_assert (npatterns_per_file > 1);
  
--  md_rtx_info info;
+-  /* Read the machine description.  */
 +  /* Reverse so we can pop the first-added element.  */
 +  output_files.reverse ();
-+
+ 
+-  md_rtx_info info;
 +  int count = 0;
 +  FILE *file = NULL;
 +
@@ -1151,7 +1211,8 @@ index 1ce0564..8d8a3c4 100644
 +    {
 +      if (count == 0 || count == npatterns_per_file)
 +	{
-+	  if (file)
++	  bool is_last = !to_stdout && output_files.is_empty ();
++	  if (file && !is_last)
 +	    if (fclose (file) != 0)
 +	      return FATAL_EXIT_CODE;
  
@@ -1164,8 +1225,10 @@ index 1ce0564..8d8a3c4 100644
 +	      const char *const filename = output_files.pop ();
 +	      file = fopen (filename, "w");
 +	    }
-+	  else
++	  else if (to_stdout)
 +	    file = stdout;
++	  else
++	    break;
  
 -      case DEFINE_SPLIT:
 -	printf ("/* %s:%d */\n", info.loc.filename, info.loc.lineno);
@@ -1231,10 +1294,10 @@ index 1ce0564..8d8a3c4 100644
 +  return (fclose (file) != 0 ? FATAL_EXIT_CODE : SUCCESS_EXIT_CODE);
  }
 diff --git a/gcc/gensupport.cc b/gcc/gensupport.cc
-index dd920d6..367ba1a 100644
+index dd920d673b45..688808c7d12b 100644
 --- a/gcc/gensupport.cc
 +++ b/gcc/gensupport.cc
-@@ -3131,6 +3131,42 @@ init_rtx_reader_args (int argc, const char **argv)
+@@ -3131,6 +3131,61 @@ init_rtx_reader_args (int argc, const char **argv)
    return init_rtx_reader_args_cb (argc, argv, 0);
  }
  
@@ -1242,32 +1305,51 @@ index dd920d6..367ba1a 100644
 +int
 +count_patterns ()
 +{
-+  int count = 0;
++  int count = 0, truth = 1;
++  rtx def;
 +  class queue_elem *cur = define_attr_queue;
-+  while (cur != NULL)
++  while (cur)
 +    {
-+      count++;
++      def = cur->data;
++
++      truth = maybe_eval_c_test (get_c_test (def));
++      if (truth || !insn_elision)
++	count++;
 +      cur = cur->next;
 +    }
 +
 +  cur = define_pred_queue;
-+  while (cur != NULL)
++  while (cur)
 +    {
-+      count++;
++      def = cur->data;
++
++      truth = maybe_eval_c_test (get_c_test (def));
++      if (truth || !insn_elision)
++	count++;
 +      cur = cur->next;
 +    }
 +
 +  cur = define_insn_queue;
-+  while (cur != NULL)
++  truth = 1;
++  while (cur)
 +    {
-+      count++;
++      def = cur->data;
++
++      truth = maybe_eval_c_test (get_c_test (def));
++      if (truth || !insn_elision)
++	count++;
 +      cur = cur->next;
 +    }
 +
 +  cur = other_queue;
-+  while (cur != NULL)
++  truth = 1;
++  while (cur)
 +    {
-+      count++;
++      def = cur->data;
++
++      truth = maybe_eval_c_test (get_c_test (def));
++      if (truth || !insn_elision)
++	count++;
 +      cur = cur->next;
 +    }
 +
@@ -1278,7 +1360,7 @@ index dd920d6..367ba1a 100644
     describing it in *INFO.  */
  
 diff --git a/gcc/gensupport.h b/gcc/gensupport.h
-index 7925e22..7396118 100644
+index 7925e22ed418..7396118714bc 100644
 --- a/gcc/gensupport.h
 +++ b/gcc/gensupport.h
 @@ -130,6 +130,7 @@ extern rtx add_implicit_parallel (rtvec);
@@ -1290,7 +1372,7 @@ index 7925e22..7396118 100644
  extern unsigned int get_num_insn_codes ();
  
 diff --git a/gcc/read-md.cc b/gcc/read-md.cc
-index fd38818..46ab906 100644
+index fd38818e3a3e..46ab9065e3e4 100644
 --- a/gcc/read-md.cc
 +++ b/gcc/read-md.cc
 @@ -132,9 +132,9 @@ md_reader::fprint_md_ptr_loc (FILE *outf, const void *ptr)
@@ -1306,7 +1388,7 @@ index fd38818..46ab906 100644
  
  /* Return a condition that satisfies both COND1 and COND2.  Either string
 diff --git a/gcc/read-md.h b/gcc/read-md.h
-index b309c9c..2adcb58 100644
+index b309c9c3deb6..2adcb58478fe 100644
 --- a/gcc/read-md.h
 +++ b/gcc/read-md.h
 @@ -194,7 +194,7 @@ class md_reader
