@@ -1,5 +1,5 @@
 https://gcc.gnu.org/PR112568
-https://gcc.gnu.org/PR112572
+https://gcc.gnu.org/PR112572 (specifically https://gcc.gnu.org/PR112572#c18 for the patch)
 https://bugs.gentoo.org/917496
 https://bugs.gentoo.org/917486
 --- a/gcc/compare-elim.cc
