@@ -1,9 +1,9 @@
 https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=bc45e18d433f879a02e369d027829f90f9e85724
 
-From f68becb26d43428a8e35ff2528c2bce719a7bb0a Mon Sep 17 00:00:00 2001
+From e351a8c9975b93e3e98e52342cb77b6a2969257f Mon Sep 17 00:00:00 2001
 From: Tamar Christina <tamar.christina@arm.com>
 Date: Mon, 12 Jun 2023 14:06:08 +0100
-Subject: [PATCH 2/6] Remove DEFAULT_MATCHPD_PARTITIONS macro
+Subject: [PATCH 10/14] Remove DEFAULT_MATCHPD_PARTITIONS macro
 
 As Jakub pointed out, DEFAULT_MATCHPD_PARTITIONS
 is now unused and can be removed.
@@ -21,10 +21,10 @@ gcc/ChangeLog:
  2 files changed, 2 insertions(+), 9 deletions(-)
 
 diff --git a/gcc/configure b/gcc/configure
-index 843fd5449dd..3750f77fd03 100755
+index 2c124f1b0337..61c18a13ab7b 100755
 --- a/gcc/configure
 +++ b/gcc/configure
-@@ -7908,11 +7908,6 @@ if (test $DEFAULT_MATCHPD_PARTITIONS -lt 1); then
+@@ -7914,11 +7914,6 @@ if (test $DEFAULT_MATCHPD_PARTITIONS -lt 1); then
  fi
  
  
@@ -36,26 +36,26 @@ index 843fd5449dd..3750f77fd03 100755
  
  # Enable __cxa_atexit for C++.
  # Check whether --enable-__cxa_atexit was given.
-@@ -19850,7 +19845,7 @@ else
+@@ -19873,7 +19868,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 19853 "configure"
-+#line 19848 "configure"
+-#line 19876 "configure"
++#line 19871 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -19956,7 +19951,7 @@ else
+@@ -19979,7 +19974,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 19959 "configure"
-+#line 19954 "configure"
+-#line 19982 "configure"
++#line 19977 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
 diff --git a/gcc/configure.ac b/gcc/configure.ac
-index de5e3aef2c8..7f8aa5329c7 100644
+index 526ce0665a3e..c15b65367419 100644
 --- a/gcc/configure.ac
 +++ b/gcc/configure.ac
 @@ -932,8 +932,6 @@ if (test $DEFAULT_MATCHPD_PARTITIONS -lt 1); then
@@ -68,5 +68,5 @@ index de5e3aef2c8..7f8aa5329c7 100644
  
  # Enable __cxa_atexit for C++.
 -- 
-2.42.0
+2.43.0
 

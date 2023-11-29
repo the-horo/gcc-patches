@@ -6,6 +6,10 @@
 	U 79_all_genmatch-split-shared-code-to-gimple-match-exports.c.patch
 	U 80_all_match.pd-automatically-partition-match.cc-files.patch
 	U 81_all_match.pd-Use-splits-in-makefile-and-make-configurabl.patch
+	U 87_all_Remove-DEFAULT_MATCHPD_PARTITIONS-macro.patch
+	U 88_all_Makefile.in-Make-TM_P_H-depend-on-TREE_H-PR111021.patch
+	U 89_all_Makefile.in-Make-recog.h-depend-on-TREE_H-PR111021.patch
+	U 90_all_PR54179_genemit-Split-insn-emit.cc-into-ten-files.patch
 	+ 82_all_Makefile.in-clean-up-match.pd-related-dependencies.patch
 
 10	28 Oct 2023
