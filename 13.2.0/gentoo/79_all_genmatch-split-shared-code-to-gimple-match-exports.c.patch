@@ -1,9 +1,9 @@
 https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109927#c21
 
-From db6e98b2677c4c3e08756902827e922d6da0f80b Mon Sep 17 00:00:00 2001
+From d5e12d6bf0a763f37e99eef5d579d9a6417e067c Mon Sep 17 00:00:00 2001
 From: Tamar Christina <tamar.christina@arm.com>
 Date: Fri, 5 May 2023 13:37:49 +0100
-Subject: [PATCH 4/6] genmatch: split shared code to gimple-match-exports.cc
+Subject: [PATCH 05/14] genmatch: split shared code to gimple-match-exports.cc
 
 In preparation for automatically splitting match.pd files I split off the
 non-static helper functions that are shared between the match.pd functions off
@@ -39,7 +39,7 @@ gcc/ChangeLog:
  create mode 100644 gcc/gimple-match-exports.cc
 
 diff --git a/gcc/Makefile.in b/gcc/Makefile.in
-index b8abc9a70b7..f5f189916c1 100644
+index 06d192fa9ed8..406856acde1c 100644
 --- a/gcc/Makefile.in
 +++ b/gcc/Makefile.in
 @@ -223,6 +223,7 @@ libgcov-util.o-warn = -Wno-error
@@ -68,10 +68,10 @@ index b8abc9a70b7..f5f189916c1 100644
  
  s-match: build/genmatch$(build_exeext) $(srcdir)/match.pd cfn-operators.pd
 diff --git a/gcc/genmatch.cc b/gcc/genmatch.cc
-index b2e01dee2fa..09548bdac29 100644
+index a0643aa37308..5320d4110082 100644
 --- a/gcc/genmatch.cc
 +++ b/gcc/genmatch.cc
-@@ -3955,7 +3955,7 @@ decision_tree::gen (FILE *f, bool gimple)
+@@ -3957,7 +3957,7 @@ decision_tree::gen (FILE *f, bool gimple)
        if (! has_kids_p)
  	{
  	  if (gimple)
@@ -80,7 +80,7 @@ index b2e01dee2fa..09548bdac29 100644
  			"gimple_simplify (gimple_match_op*, gimple_seq*,\n"
  			"                 tree (*)(tree), code_helper,\n"
  			"                 const tree");
-@@ -3978,7 +3978,7 @@ decision_tree::gen (FILE *f, bool gimple)
+@@ -3980,7 +3980,7 @@ decision_tree::gen (FILE *f, bool gimple)
        /* Then generate the main entry with the outermost switch and
           tail-calls to the split-out functions.  */
        if (gimple)
@@ -91,7 +91,7 @@ index b2e01dee2fa..09548bdac29 100644
  		 "                 code_helper code, const tree type");
 diff --git a/gcc/gimple-match-exports.cc b/gcc/gimple-match-exports.cc
 new file mode 100644
-index 00000000000..7aeb4ddb152
+index 000000000000..7aeb4ddb1524
 --- /dev/null
 +++ b/gcc/gimple-match-exports.cc
 @@ -0,0 +1,1253 @@
@@ -1349,7 +1349,7 @@ index 00000000000..7aeb4ddb152
 +  return get_conditional_internal_fn (associated_internal_fn (cfn, type));
 +}
 diff --git a/gcc/gimple-match-head.cc b/gcc/gimple-match-head.cc
-index ec603f9d043..b08cd891a13 100644
+index ec603f9d043c..b08cd891a13a 100644
 --- a/gcc/gimple-match-head.cc
 +++ b/gcc/gimple-match-head.cc
 @@ -48,1089 +48,8 @@ along with GCC; see the file COPYING3.  If not see
@@ -2556,5 +2556,5 @@ index ec603f9d043..b08cd891a13 100644
 -  return get_conditional_internal_fn (associated_internal_fn (cfn, type));
 -}
 -- 
-2.40.1
+2.43.0
 
