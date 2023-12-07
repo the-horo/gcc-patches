@@ -1,0 +1,20 @@
+https://gcc.gnu.org/PR112869 (https://gcc.gnu.org/PR112869#c2)
+https://gcc.gnu.org/PR112907
+--- a/gcc/cp/cp-gimplify.cc
++++ b/gcc/cp/cp-gimplify.cc
+@@ -1177,13 +1177,9 @@ cp_fold_immediate_r (tree *stmt_p, int *walk_subtrees, void *data_)
+                   ? tf_error : tf_none);
+   const tree_code code = TREE_CODE (stmt);
+ 
+-  /* No need to look into types or unevaluated operands.
+-     NB: This affects cp_fold_r as well.  */
++  /* No need to look into types or unevaluated operands.  */
+   if (TYPE_P (stmt) || unevaluated_p (code) || in_immediate_context ())
+-    {
+-      *walk_subtrees = 0;
+-      return NULL_TREE;
+-    }
++    return NULL_TREE;
+ 
+   tree decl = NULL_TREE;
+   bool call_p = false;
