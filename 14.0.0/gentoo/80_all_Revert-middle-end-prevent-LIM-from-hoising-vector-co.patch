@@ -1,0 +1,50 @@
+From eccc75285320e5c4a4c21ec48ac2ab8bf8ca3580 Mon Sep 17 00:00:00 2001
+From: Sam James <sam@gentoo.org>
+Date: Mon, 25 Dec 2023 16:57:15 +0000
+Subject: [PATCH 6/7] Revert "middle-end: prevent LIM from hoising vector
+ compares from gconds if target does not support it."
+
+This reverts commit f1dcc0fe371e3cb10d2cbe3f6c88db6f72edddda.
+
+Bug: https://gcc.gnu.org/PR113135
+Bug: https://gcc.gnu.org/PR113136
+Bug: https://gcc.gnu.org/PR113137
+Signed-off-by: Sam James <sam@gentoo.org>
+---
+ gcc/tree-ssa-loop-im.cc | 13 -------------
+ 1 file changed, 13 deletions(-)
+
+diff --git a/gcc/tree-ssa-loop-im.cc b/gcc/tree-ssa-loop-im.cc
+index 2ebf6d6548c4..396963b6754c 100644
+--- a/gcc/tree-ssa-loop-im.cc
++++ b/gcc/tree-ssa-loop-im.cc
+@@ -48,8 +48,6 @@ along with GCC; see the file COPYING3.  If not see
+ #include "tree-dfa.h"
+ #include "tree-ssa.h"
+ #include "dbgcnt.h"
+-#include "insn-codes.h"
+-#include "optabs-tree.h"
+ 
+ /* TODO:  Support for predicated code motion.  I.e.
+ 
+@@ -854,17 +852,6 @@ determine_max_movement (gimple *stmt, bool must_preserve_exec)
+ 	  if (!extract_true_false_args_from_phi (dom, phi, NULL, NULL))
+ 	    return false;
+ 
+-	/* Check if one of the depedent statement is a vector compare whether
+-	   the target supports it,  otherwise it's invalid to hoist it out of
+-	   the gcond it belonged to.  */
+-	if (VECTOR_TYPE_P (TREE_TYPE (gimple_cond_lhs (cond))))
+-	  {
+-	    tree type = TREE_TYPE (gimple_cond_lhs (cond));
+-	    auto code = gimple_cond_code (cond);
+-	    if (!target_supports_op_p (type, code, optab_vector))
+-	      return false;
+-	  }
+-
+ 	  /* Fold in dependencies and cost of the condition.  */
+ 	  FOR_EACH_SSA_TREE_OPERAND (val, cond, iter, SSA_OP_USE)
+ 	    {
+-- 
+2.43.0
+
