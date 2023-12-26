@@ -1,10 +1,9 @@
-13	25 Dec 2023
+13	?? ??? ????
 
-	- 75_all_Revert-middle-end-explicitly-initialize-vec_stmts-PR.patch
+        + 75_all_Revert-middle-end-explicitly-initialize-vec_stmts-PR.patch
 
 12	25 Dec 2023
 
-	+ 75_all_Revert-middle-end-explicitly-initialize-vec_stmts-PR.patch
 	+ 76_all_Revert-testsuite-un-xfail-TSVC-loops-that-check-for-.patch
 	+ 77_all_Revert-testsuite-Add-tests-for-early-break-vectoriza.patch
 	+ 78_all_Revert-AArch64-Add-implementation-for-vector-cbranch.patch
