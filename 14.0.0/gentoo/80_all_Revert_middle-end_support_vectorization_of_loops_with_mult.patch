@@ -1,7 +1,7 @@
-From 3385d9b56e25b75a2e0fe3286b329b82b703362d Mon Sep 17 00:00:00 2001
+From 884068ec19c846246ab55b4820fd2badca329339 Mon Sep 17 00:00:00 2001
 From: Sam James <sam@gentoo.org>
 Date: Mon, 25 Dec 2023 16:57:14 +0000
-Subject: [PATCH 5/7] Revert "middle-end: Support vectorization of loops with
+Subject: [PATCH 6/8] Revert "middle-end: Support vectorization of loops with
  multiple exits."
 
 This reverts commit 01f4251b8775c832a92d55e2df57c9ac72eaceef.
@@ -22,7 +22,7 @@ Signed-off-by: Sam James <sam@gentoo.org>
  8 files changed, 233 insertions(+), 1330 deletions(-)
 
 diff --git a/gcc/tree-if-conv.cc b/gcc/tree-if-conv.cc
-index 9638d3cc869a..e169413bb44c 100644
+index 8e79362f96ab..bb87db382086 100644
 --- a/gcc/tree-if-conv.cc
 +++ b/gcc/tree-if-conv.cc
 @@ -844,7 +844,7 @@ idx_within_array_bound (tree ref, tree *idx, void *dta)
@@ -35,7 +35,7 @@ index 9638d3cc869a..e169413bb44c 100644
  {
    class loop *loop = loop_containing_stmt (stmt);
 diff --git a/gcc/tree-vect-data-refs.cc b/gcc/tree-vect-data-refs.cc
-index 3d9673fb0b58..d5c9c4a11c2e 100644
+index 752c34c26e9b..290303f198b5 100644
 --- a/gcc/tree-vect-data-refs.cc
 +++ b/gcc/tree-vect-data-refs.cc
 @@ -613,238 +613,6 @@ vect_analyze_data_ref_dependence (struct data_dependence_relation *ddr,
@@ -290,7 +290,7 @@ index 3d9673fb0b58..d5c9c4a11c2e 100644
  }
  
 diff --git a/gcc/tree-vect-loop-manip.cc b/gcc/tree-vect-loop-manip.cc
-index 295e1c916874..bcd90a331f5a 100644
+index 9330183bfb9e..9182192710eb 100644
 --- a/gcc/tree-vect-loop-manip.cc
 +++ b/gcc/tree-vect-loop-manip.cc
 @@ -448,20 +448,6 @@ vect_adjust_loop_lens_control (tree iv_type, gimple_seq *seq,
@@ -881,7 +881,7 @@ index 295e1c916874..bcd90a331f5a 100644
  
  	  for (gsi = gsi_start_phis (merge_bb); !gsi_end_p (gsi);
 diff --git a/gcc/tree-vect-loop.cc b/gcc/tree-vect-loop.cc
-index 88261a3a4f57..7a3db5f098ba 100644
+index 2bd96b56006a..5d5f57561741 100644
 --- a/gcc/tree-vect-loop.cc
 +++ b/gcc/tree-vect-loop.cc
 @@ -1040,7 +1040,6 @@ _loop_vec_info::_loop_vec_info (class loop *loop_in, vec_info_shared *shared)
@@ -1577,7 +1577,7 @@ index 88261a3a4f57..7a3db5f098ba 100644
       below.  */
    if (!loop_vinfo->slp_instances.is_empty ())
 diff --git a/gcc/tree-vect-patterns.cc b/gcc/tree-vect-patterns.cc
-index 2053673debe9..696b70b76a82 100644
+index f1a95ef34b93..b0ceb1007bd4 100644
 --- a/gcc/tree-vect-patterns.cc
 +++ b/gcc/tree-vect-patterns.cc
 @@ -132,7 +132,6 @@ vect_init_pattern_stmt (vec_info *vinfo, gimple *pattern_stmt,
@@ -1827,7 +1827,7 @@ index 2053673debe9..696b70b76a82 100644
    if (STMT_VINFO_REDUC_IDX (orig_stmt_info_saved) != -1)
      {
 diff --git a/gcc/tree-vect-stmts.cc b/gcc/tree-vect-stmts.cc
-index 1333d8934783..e9ff728dfd40 100644
+index bdbf08c9d298..267bb444c284 100644
 --- a/gcc/tree-vect-stmts.cc
 +++ b/gcc/tree-vect-stmts.cc
 @@ -342,7 +342,6 @@ is_simple_and_all_uses_invariant (stmt_vec_info stmt_info,
@@ -2305,7 +2305,7 @@ index 1333d8934783..e9ff728dfd40 100644
  	scalar_type = TREE_TYPE (DR_REF (dr));
        else if (gimple_call_internal_p (stmt, IFN_MASK_STORE))
 diff --git a/gcc/tree-vectorizer.cc b/gcc/tree-vectorizer.cc
-index 8b495fc7ca13..d97e2b54c25a 100644
+index 9001b738bf31..8e34549b1775 100644
 --- a/gcc/tree-vectorizer.cc
 +++ b/gcc/tree-vectorizer.cc
 @@ -1381,9 +1381,7 @@ pass_vectorize::execute (function *fun)
@@ -2320,7 +2320,7 @@ index 8b495fc7ca13..d97e2b54c25a 100644
        edge entry = EDGE_PRED (loop_preheader_edge (loop)->src, 0);
        do_rpo_vn (fun, entry, exit_bbs);
 diff --git a/gcc/tree-vectorizer.h b/gcc/tree-vectorizer.h
-index 785fc99ca27a..1810833a324a 100644
+index db44d730b702..62c9818ee0dd 100644
 --- a/gcc/tree-vectorizer.h
 +++ b/gcc/tree-vectorizer.h
 @@ -66,7 +66,6 @@ enum vect_def_type {

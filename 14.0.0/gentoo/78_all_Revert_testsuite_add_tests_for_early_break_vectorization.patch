@@ -1,7 +1,7 @@
-From 3283ec82265c4bd51a2d113ebe44310169614650 Mon Sep 17 00:00:00 2001
+From 2fe83ac81d631810a520e5938224c5d10ffbc269 Mon Sep 17 00:00:00 2001
 From: Sam James <sam@gentoo.org>
 Date: Mon, 25 Dec 2023 16:57:13 +0000
-Subject: [PATCH 3/7] Revert "testsuite: Add tests for early break
+Subject: [PATCH 4/8] Revert "testsuite: Add tests for early break
  vectorization"
 
 This reverts commit c5232ec14937a34e599e9e386a5975fab9a5e283.
@@ -232,10 +232,10 @@ Signed-off-by: Sam James <sam@gentoo.org>
  delete mode 100644 gcc/testsuite/gcc.dg/vect/vect-early-break_93.c
 
 diff --git a/gcc/doc/sourcebuild.texi b/gcc/doc/sourcebuild.texi
-index bd62b21f3b72..4be67daedb20 100644
+index 3a394e7739b6..35da6c11a5a9 100644
 --- a/gcc/doc/sourcebuild.texi
 +++ b/gcc/doc/sourcebuild.texi
-@@ -1636,14 +1636,6 @@ Target supports hardware vectors of @code{float} when
+@@ -1645,14 +1645,6 @@ Target supports hardware vectors of @code{float} when
  @option{-funsafe-math-optimizations} is not in effect.
  This implies @code{vect_float}.
  
@@ -250,7 +250,7 @@ index bd62b21f3b72..4be67daedb20 100644
  @item vect_int
  Target supports hardware vectors of @code{int}.
  
-@@ -3213,11 +3205,6 @@ instructions, if any.
+@@ -3222,11 +3214,6 @@ instructions, if any.
  @item tls
  Add the target-specific flags needed to use thread-local storage.
  
@@ -4902,10 +4902,10 @@ index 656a7788896d..000000000000
 -  return 0;
 -}
 diff --git a/gcc/testsuite/lib/target-supports.exp b/gcc/testsuite/lib/target-supports.exp
-index 05fc417877bc..7f13ff0ca565 100644
+index d65953158651..dc8e0bc7c2bd 100644
 --- a/gcc/testsuite/lib/target-supports.exp
 +++ b/gcc/testsuite/lib/target-supports.exp
-@@ -4050,44 +4050,6 @@ proc check_effective_target_vect_int { } {
+@@ -4060,44 +4060,6 @@ proc check_effective_target_vect_int { } {
  	}}]
  }
  

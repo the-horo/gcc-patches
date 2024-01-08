@@ -1,7 +1,7 @@
-From 846bfbdd30d437e40e10ce8bcd896f263436dfc1 Mon Sep 17 00:00:00 2001
+From 21f952dd33ae6037ff1a18cfe1c52dcc9becce19 Mon Sep 17 00:00:00 2001
 From: Sam James <sam@gentoo.org>
 Date: Mon, 25 Dec 2023 16:57:12 +0000
-Subject: [PATCH 2/7] Revert "testsuite: un-xfail TSVC loops that check for
+Subject: [PATCH 2/8] Revert "testsuite: un-xfail TSVC loops that check for
  exit control flow vectorization"
 
 This reverts commit a657c7e3518fcfc796f223d47385cad5e97dc9a5.

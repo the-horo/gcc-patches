@@ -1,3 +1,14 @@
+15	8 Jan 2024
+
+	U 75_all_Revert-middle-end-explicitly-initialize-vec_stmts-PR.patch
+	U 76_all_Revert-testsuite-un-xfail-TSVC-loops-that-check-for-.patch
+	U 77_all_Revert_arm_Add_Advanced_SIMD_cbranch_implementation.patch
+	+ 78_all_Revert_testsuite_add_tests_for_early_break_vectorization.patch
+	+ 79_all_Revert_AArch64_add_implementation_for_vector_cbranch.patch
+	+ 80_all_Revert_middle-end_support_vectorization_of_loops_with_mult.patch
+	+ 81_all_Revert-middle-end-prevent-LIM-from-hoising-vector-co.patch
+	+ 82_all_testsuite_Add_more_pragma_novector_to_new_tests.patch
+
 14	31 Dec 2023
 
 	+ 75_all_Revert-middle-end-explicitly-initialize-vec_stmts-PR.patch

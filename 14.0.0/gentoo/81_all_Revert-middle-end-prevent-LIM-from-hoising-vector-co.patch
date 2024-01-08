@@ -1,7 +1,7 @@
-From eccc75285320e5c4a4c21ec48ac2ab8bf8ca3580 Mon Sep 17 00:00:00 2001
+From 596b268da13ffc54200075212eadba01ac73a847 Mon Sep 17 00:00:00 2001
 From: Sam James <sam@gentoo.org>
 Date: Mon, 25 Dec 2023 16:57:15 +0000
-Subject: [PATCH 6/7] Revert "middle-end: prevent LIM from hoising vector
+Subject: [PATCH 7/8] Revert "middle-end: prevent LIM from hoising vector
  compares from gconds if target does not support it."
 
 This reverts commit f1dcc0fe371e3cb10d2cbe3f6c88db6f72edddda.
@@ -15,7 +15,7 @@ Signed-off-by: Sam James <sam@gentoo.org>
  1 file changed, 13 deletions(-)
 
 diff --git a/gcc/tree-ssa-loop-im.cc b/gcc/tree-ssa-loop-im.cc
-index 2ebf6d6548c4..396963b6754c 100644
+index f3fda2bd7ce1..dd2aacaeee43 100644
 --- a/gcc/tree-ssa-loop-im.cc
 +++ b/gcc/tree-ssa-loop-im.cc
 @@ -48,8 +48,6 @@ along with GCC; see the file COPYING3.  If not see
