@@ -1,4 +1,4 @@
-??	?? ??? ????
+16	15 Jan 2024
 
 	- 75_all_Revert-middle-end-explicitly-initialize-vec_stmts-PR.patch
 	- 76_all_Revert-testsuite-un-xfail-TSVC-loops-that-check-for-.patch
@@ -8,6 +8,7 @@
 	- 80_all_Revert_middle-end_support_vectorization_of_loops_with_mult.patch
 	- 81_all_Revert-middle-end-prevent-LIM-from-hoising-vector-co.patch
 	- 82_all_testsuite_Add_more_pragma_novector_to_new_tests.patch
+	+ 75_all_PR113364-vect.patch
 
 15	8 Jan 2024
 
