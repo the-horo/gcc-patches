@@ -1,0 +1,15 @@
+https://gcc.gnu.org/PR113467
+
+Disable early-exit peeling variants.
+--- a/gcc/tree-vect-loop.cc
++++ b/gcc/tree-vect-loop.cc
+@@ -998,6 +998,9 @@ vec_init_loop_exit_info (class loop *loop)
+ 	}
+     }
+ 
++  if (candidate && candidate->src != EDGE_PRED (loop->latch, 0)->src)
++    return NULL;
++
+   return candidate;
+ }
+ 
