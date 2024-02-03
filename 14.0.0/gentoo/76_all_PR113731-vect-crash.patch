@@ -1,0 +1,13 @@
+https://gcc.gnu.org/PR113731
+--- a/gcc/tree-vect-loop.cc
++++ b/gcc/tree-vect-loop.cc
+@@ -11801,7 +11801,8 @@ move_early_exit_stmts (loop_vec_info loop_vinfo)
+ 
+       gimple_stmt_iterator stmt_gsi = gsi_for_stmt (stmt);
+       gsi_move_before (&stmt_gsi, &dest_gsi);
+-      gsi_prev (&dest_gsi);
++      if (!gsi_end_p (dest_gsi))
++       gsi_prev (&dest_gsi);
+     }
+ 
+   /* Update all the stmts with their new reaching VUSES.  */
