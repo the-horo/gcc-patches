@@ -1,3 +1,8 @@
+19	5 Feb 2024
+
+	- 76_all_PR113467-vect-miscompile.patch
+	+ 76_all_PR113731-vect-crash.patch
+
 18	30 Jan 2024
 
 	+ 50_all_PR111632_system_cxx_headers_libcxx.patch
