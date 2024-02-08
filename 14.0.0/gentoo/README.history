@@ -1,3 +1,10 @@
+20	8 Feb 2024
+
+	+ 75_all_PR113731_fix-ICE-when-moving-statements-to-empty-B.patch
+	+ 76_all_PR113750_fix-ICE-when-destination-BB-for-stores-st.patch
+	+ 77_all_PR113808-middle-end-don-t-cache-restart_loop-in-vectorizable.patch
+	+ 78_all_PR113776-c-boolean-conversion.patch
+	
 19	5 Feb 2024
 
 	- 76_all_PR113467-vect-miscompile.patch
