@@ -1,0 +1,93 @@
+https://gcc.gnu.org/PR113734
+
+From 491e57451df47cda88f658601a92d6d006ae09d7 Mon Sep 17 00:00:00 2001
+From: Tamar Christina <tamar.christina@arm.com>
+Date: Tue, 13 Feb 2024 11:04:38 +0000
+Subject: [PATCH] middle-end: update vector loop upper bounds when early break
+ vect [PR113734]
+
+When doing early break vectorization we should treat the final iteration as
+possibly being partial.  This so that when we calculate the vector loop upper
+bounds we take into account that final iteration could have done some work.
+
+The attached testcase shows that if we don't then cunroll may unroll the loop an
+if the upper bound is wrong we lose a vector iteration.
+
+This is similar to how we adjust the scalar loop bounds for the PEELED case.
+
+gcc/ChangeLog:
+
+	PR tree-optimization/113734
+	* tree-vect-loop.cc (vect_transform_loop): Treat the final iteration of
+	an early break loop as partial.
+
+gcc/testsuite/ChangeLog:
+
+	PR tree-optimization/113734
+	* gcc.dg/vect/vect-early-break_117-pr113734.c: New test.
+---
+ .../vect/vect-early-break_117-pr113734.c      | 37 +++++++++++++++++++
+ gcc/tree-vect-loop.cc                         |  3 +-
+ 2 files changed, 39 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-early-break_117-pr113734.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-early-break_117-pr113734.c b/gcc/testsuite/gcc.dg/vect/vect-early-break_117-pr113734.c
+new file mode 100644
+index 000000000000..36ae09483dfd
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-early-break_117-pr113734.c
+@@ -0,0 +1,37 @@
++/* { dg-add-options vect_early_break } */
++/* { dg-require-effective-target vect_early_break_hw } */
++/* { dg-require-effective-target vect_int } */
++/* { dg-additional-options "-O3" } */
++
++/* { dg-final { scan-tree-dump "LOOP VECTORIZED" "vect" } } */
++
++#include "tree-vect.h"
++
++#define N 306
++#define NEEDLE 136
++
++int table[N];
++
++__attribute__ ((noipa))
++int foo (int i, unsigned short parse_tables_n)
++{
++  parse_tables_n >>= 9;
++  parse_tables_n += 11;
++  while (i < N && parse_tables_n--)
++    table[i++] = 0;
++
++  return table[NEEDLE];
++}
++
++int main ()
++{
++  check_vect ();
++
++  for (int j = 0; j < N; j++)
++    table[j] = -1;
++
++  if (foo (0, 0xFFFF) != 0)
++    __builtin_abort ();
++
++  return 0;
++}
+diff --git a/gcc/tree-vect-loop.cc b/gcc/tree-vect-loop.cc
+index 04f4b5b6b2fa..367077965fd9 100644
+--- a/gcc/tree-vect-loop.cc
++++ b/gcc/tree-vect-loop.cc
+@@ -12174,7 +12174,8 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
+   /* True if the final iteration might not handle a full vector's
+      worth of scalar iterations.  */
+   bool final_iter_may_be_partial
+-    = LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo);
++    = LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
++      || LOOP_VINFO_EARLY_BREAKS (loop_vinfo);
+   /* The minimum number of iterations performed by the epilogue.  This
+      is 1 when peeling for gaps because we always need a final scalar
+      iteration.  */
+-- 
+2.43.1
+
