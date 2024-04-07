@@ -1,3 +1,8 @@
+26	7 Apr 2024
+
+	U 02_all_default-warn-format-security.patch
+	U 04_all_nossp-on-nostdlib.patch
+
 25	11 Mar 2024
 
 	- 50_all_PR111632_system_cxx_headers_libcxx.patch
