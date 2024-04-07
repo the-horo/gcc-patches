@@ -1,9 +1,9 @@
 https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109927#c21
 
-From 30f78d42a215686cab9c7276076f11e5ea08341d Mon Sep 17 00:00:00 2001
+From 6178fddd3e0957fbb8bcfc443fef172691b7640b Mon Sep 17 00:00:00 2001
 From: Tamar Christina <tamar.christina@arm.com>
 Date: Fri, 5 May 2023 13:35:17 +0100
-Subject: [PATCH 02/14] match.pd: don't emit label if not needed
+Subject: [PATCH 01/15] match.pd: don't emit label if not needed
 
 This is a small QoL codegen improvement for match.pd to not emit labels when
 they are not needed.  The codegen is nice and there is a small (but consistent)
@@ -20,7 +20,7 @@ gcc/ChangeLog:
  1 file changed, 22 insertions(+), 8 deletions(-)
 
 diff --git a/gcc/genmatch.cc b/gcc/genmatch.cc
-index 98b429a9d0bb..0c5a19aca8ed 100644
+index c1023d921fca..9ecd0a462b4f 100644
 --- a/gcc/genmatch.cc
 +++ b/gcc/genmatch.cc
 @@ -3354,6 +3354,7 @@ dt_simplify::gen_1 (FILE *f, int indent, bool gimple, operand *result)
@@ -110,5 +110,5 @@ index 98b429a9d0bb..0c5a19aca8ed 100644
  }
  
 -- 
-2.43.0
+2.44.0
 

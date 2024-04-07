@@ -1,6 +1,18 @@
 15	7 Apr 2024
 
 	- 50_all_PR111632_system_cxx_headers_libcxx.patch
+	U 76_all_match.pd-don-t-emit-label-if-not-needed.patch
+	U 77_all_match.pd-Remove-commented-out-line-pragmas-unless-vv.patch
+	U 78_all_match.pd-CSE-the-dump-output-check.patch
+	U 79_all_genmatch-split-shared-code-to-gimple-match-exports.c.patch
+	U 80_all_match.pd-automatically-partition-match.cc-files.patch
+	U 81_all_match.pd-Use-splits-in-makefile-and-make-configurabl.patch
+	U 82_all_Makefile.in-clean-up-match.pd-related-dependencies.patch
+	U 86_all_build-Replace-seq-for-portability-with-GNU-Make-vari.patch
+	U 87_all_Remove-DEFAULT_MATCHPD_PARTITIONS-macro.patch
+	U 88_all_Makefile.in-Make-TM_P_H-depend-on-TREE_H-PR111021.patch
+	U 89_all_Makefile.in-Make-recog.h-depend-on-TREE_H-PR111021.patch
+	U 90_all_PR54179_genemit-Split-insn-emit.cc-into-ten-files.patch
 	+ 92_all_riscv_PR109760-gstreamer.patch
 
 14	28 Feb 2024

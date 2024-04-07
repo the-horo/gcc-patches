@@ -1,9 +1,9 @@
 https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=ecb95399f43873e1f34119ac260bbea2ef358e53
 
-From fcf952823a3d246e6459ce7454144a96fc1f540b Mon Sep 17 00:00:00 2001
+From 45b0ac72b82e483ac2b8380ce08cedcfd021afb0 Mon Sep 17 00:00:00 2001
 From: Kewen Lin <linkw@linux.ibm.com>
 Date: Tue, 15 Aug 2023 03:01:20 -0500
-Subject: [PATCH 13/14] Makefile.in: Make recog.h depend on $(TREE_H)
+Subject: [PATCH 12/15] Makefile.in: Make recog.h depend on $(TREE_H)
  [PR111021]
 
 Commit r14-3093 introduced a random build failure on
@@ -41,5 +41,5 @@ index 115d2a6d9b76..2c16b14ad0f3 100644
  FLAGS_H = flags.h flag-types.h $(OPTIONS_H)
  OPTIONS_H = options.h flag-types.h $(OPTIONS_H_EXTRA)
 -- 
-2.43.0
+2.44.0
 

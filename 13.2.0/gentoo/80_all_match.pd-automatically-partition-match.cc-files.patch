@@ -1,9 +1,9 @@
 https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109927#c21
 
-From 0b9341cec30004016c4a66013882ea983a9e3810 Mon Sep 17 00:00:00 2001
+From daac5d2f67656dcf8cc2bbff1c6eaa34f3fb55b9 Mon Sep 17 00:00:00 2001
 From: Tamar Christina <tamar.christina@arm.com>
 Date: Fri, 5 May 2023 13:38:50 +0100
-Subject: [PATCH 06/14] match.pd: automatically partition *-match.cc files.
+Subject: [PATCH 05/15] match.pd: automatically partition *-match.cc files.
 
 Following on from Richi's RFC[1] this is another attempt to split up match.pd
 into multiple gimple-match and generic-match files.  This version is fully
@@ -111,7 +111,7 @@ gcc/ChangeLog:
  1 file changed, 190 insertions(+), 36 deletions(-)
 
 diff --git a/gcc/genmatch.cc b/gcc/genmatch.cc
-index 5320d4110082..6cb05d006e8d 100644
+index 665d7e2106ff..f80e4b972288 100644
 --- a/gcc/genmatch.cc
 +++ b/gcc/genmatch.cc
 @@ -183,6 +183,33 @@ fprintf_indent (FILE *f, unsigned int indent, const char *format, ...)
@@ -374,7 +374,7 @@ index 5320d4110082..6cb05d006e8d 100644
  }
  
  
-@@ -5215,6 +5293,30 @@ round_alloc_size (size_t s)
+@@ -5213,6 +5291,30 @@ round_alloc_size (size_t s)
  }
  
  
@@ -405,7 +405,7 @@ index 5320d4110082..6cb05d006e8d 100644
  /* The genmatch generator program.  It reads from a pattern description
     and outputs GIMPLE or GENERIC IL matching and simplification routines.  */
  
-@@ -5229,25 +5331,44 @@ main (int argc, char **argv)
+@@ -5227,25 +5329,44 @@ main (int argc, char **argv)
      return 1;
  
    bool gimple = true;
@@ -454,7 +454,7 @@ index 5320d4110082..6cb05d006e8d 100644
    line_table = XCNEW (class line_maps);
    linemap_init (line_table, 0);
    line_table->reallocator = xrealloc;
-@@ -5294,10 +5415,28 @@ main (int argc, char **argv)
+@@ -5292,10 +5413,28 @@ main (int argc, char **argv)
    /* Parse ahead!  */
    parser p (r, gimple);
  
@@ -486,7 +486,7 @@ index 5320d4110082..6cb05d006e8d 100644
  
    /* Go over all predicates defined with patterns and perform
       lowering and code generation.  */
-@@ -5317,7 +5456,10 @@ main (int argc, char **argv)
+@@ -5315,7 +5454,10 @@ main (int argc, char **argv)
        if (verbose == 2)
  	dt.print (stderr);
  
@@ -498,7 +498,7 @@ index 5320d4110082..6cb05d006e8d 100644
      }
  
    /* Lower the main simplifiers and generate code for them.  */
-@@ -5334,7 +5476,19 @@ main (int argc, char **argv)
+@@ -5332,7 +5474,19 @@ main (int argc, char **argv)
    if (verbose == 2)
      dt.print (stderr);
  
@@ -520,5 +520,5 @@ index 5320d4110082..6cb05d006e8d 100644
    /* Finalize.  */
    cpp_finish (r, NULL);
 -- 
-2.43.0
+2.44.0
 

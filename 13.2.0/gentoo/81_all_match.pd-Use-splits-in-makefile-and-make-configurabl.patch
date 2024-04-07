@@ -1,9 +1,9 @@
 https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109927#c21
 
-From 7ad6dc24f067e3ecf608143274c36b1eec51ba93 Mon Sep 17 00:00:00 2001
+From dcfebe060ee266f364bb60f1cdf0cec58818c4f7 Mon Sep 17 00:00:00 2001
 From: Tamar Christina <tamar.christina@arm.com>
 Date: Fri, 5 May 2023 13:42:17 +0100
-Subject: [PATCH 07/14] match.pd: Use splits in makefile and make configurable.
+Subject: [PATCH 06/15] match.pd: Use splits in makefile and make configurable.
 
 This updates the build system to split up match.pd files into chunks of 10.
 This also introduces a new flag --with-matchpd-partitions which can be used to
@@ -26,9 +26,10 @@ gcc/ChangeLog:
 (cherry picked from commit 0a85544e1aaeca41133ecfc438cda913dbc0f122)
 ---
  gcc/Makefile.in  | 67 +++++++++++++++++++++++++++++++++---------------
+ gcc/config.in    |  6 +++++
  gcc/configure    | 29 +++++++++++++++++++--
  gcc/configure.ac | 15 +++++++++++
- 3 files changed, 89 insertions(+), 22 deletions(-)
+ 4 files changed, 95 insertions(+), 22 deletions(-)
 
 diff --git a/gcc/Makefile.in b/gcc/Makefile.in
 index 406856acde1c..f0c34d00ecbc 100644
@@ -152,8 +153,25 @@ index 406856acde1c..f0c34d00ecbc 100644
         c-family/c-target-hooks-def.h d/d-target-hooks-def.h \
         case-cfn-macros.h \
         cfn-operators.pd omp-device-properties.h
+diff --git a/gcc/config.in b/gcc/config.in
+index 5281a12a707c..ea60c5b11fc5 100644
+--- a/gcc/config.in
++++ b/gcc/config.in
+@@ -67,6 +67,12 @@
+ #endif
+ 
+ 
++/* Define to larger than one set the number of match.pd partitions to make. */
++#ifndef USED_FOR_TARGET
++#undef DEFAULT_MATCHPD_PARTITIONS
++#endif
++
++
+ /* Define to larger than zero set the default stack clash protector size. */
+ #ifndef USED_FOR_TARGET
+ #undef DEFAULT_STK_CLASH_GUARD_SIZE
 diff --git a/gcc/configure b/gcc/configure
-index dec2eca1a453..2c124f1b0337 100755
+index ade0af23e8cc..542d100c2b73 100755
 --- a/gcc/configure
 +++ b/gcc/configure
 @@ -838,6 +838,7 @@ enable_gcov
@@ -182,7 +200,7 @@ index dec2eca1a453..2c124f1b0337 100755
    --with-dwarf2           force the default debug format to be DWARF 2 (or
                            later)
    --with-specs=SPECS      add SPECS to driver command-line processing
-@@ -7895,6 +7900,26 @@ cat >>confdefs.h <<_ACEOF
+@@ -7918,6 +7923,26 @@ cat >>confdefs.h <<_ACEOF
  _ACEOF
  
  
@@ -209,29 +227,29 @@ index dec2eca1a453..2c124f1b0337 100755
  # Enable __cxa_atexit for C++.
  # Check whether --enable-__cxa_atexit was given.
  if test "${enable___cxa_atexit+set}" = set; then :
-@@ -19848,7 +19873,7 @@ else
+@@ -19871,7 +19896,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 19851 "configure"
-+#line 19876 "configure"
+-#line 19874 "configure"
++#line 19899 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -19954,7 +19979,7 @@ else
+@@ -19977,7 +20002,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 19957 "configure"
-+#line 19982 "configure"
+-#line 19980 "configure"
++#line 20005 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
 diff --git a/gcc/configure.ac b/gcc/configure.ac
-index c0d067ec2716..526ce0665a3e 100644
+index bf8ff4d63906..31aa8566a3e7 100644
 --- a/gcc/configure.ac
 +++ b/gcc/configure.ac
-@@ -921,6 +921,21 @@ fi
+@@ -943,6 +943,21 @@ fi
  AC_DEFINE_UNQUOTED(DEFAULT_STK_CLASH_GUARD_SIZE, $DEFAULT_STK_CLASH_GUARD_SIZE,
  	[Define to larger than zero set the default stack clash protector size.])
  
@@ -254,5 +272,5 @@ index c0d067ec2716..526ce0665a3e 100644
  AC_ARG_ENABLE(__cxa_atexit,
  [AS_HELP_STRING([--enable-__cxa_atexit], [enable __cxa_atexit for C++])],
 -- 
-2.43.0
+2.44.0
 

@@ -1,9 +1,9 @@
 https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=8353b9c5f5af0e65cb04fcbb7325d6a566006cd4
 
-From f9139ea69c23448a874cbb64c2d201cf9f7ece2f Mon Sep 17 00:00:00 2001
+From 87192b63d3ab56543461cb456c4f8b2f1085fd6c Mon Sep 17 00:00:00 2001
 From: Kewen Lin <linkw@linux.ibm.com>
 Date: Fri, 18 Aug 2023 05:03:40 -0500
-Subject: [PATCH 12/14] Makefile.in: Make TM_P_H depend on $(TREE_H) [PR111021]
+Subject: [PATCH 11/15] Makefile.in: Make TM_P_H depend on $(TREE_H) [PR111021]
 
 As PR111021 shows, the below ${port}-protos.h include tree.h
 for code_helper and tree_code:
@@ -62,5 +62,5 @@ index 975fbb61ea8a..115d2a6d9b76 100644
  GTM_H     = tm.h      $(tm_file_list) insn-constants.h
  TM_H      = $(GTM_H) insn-flags.h $(OPTIONS_H)
 -- 
-2.43.0
+2.44.0
 

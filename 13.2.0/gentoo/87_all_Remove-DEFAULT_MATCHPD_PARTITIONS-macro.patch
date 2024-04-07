@@ -1,9 +1,9 @@
 https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=bc45e18d433f879a02e369d027829f90f9e85724
 
-From e351a8c9975b93e3e98e52342cb77b6a2969257f Mon Sep 17 00:00:00 2001
+From b60091fe7d22e0cac71461dceeb804e37555b5d3 Mon Sep 17 00:00:00 2001
 From: Tamar Christina <tamar.christina@arm.com>
 Date: Mon, 12 Jun 2023 14:06:08 +0100
-Subject: [PATCH 10/14] Remove DEFAULT_MATCHPD_PARTITIONS macro
+Subject: [PATCH 09/15] Remove DEFAULT_MATCHPD_PARTITIONS macro
 
 As Jakub pointed out, DEFAULT_MATCHPD_PARTITIONS
 is now unused and can be removed.
@@ -16,15 +16,33 @@ gcc/ChangeLog:
 
 (cherry picked from commit bc45e18d433f879a02e369d027829f90f9e85724)
 ---
+ gcc/config.in    | 6 ------
  gcc/configure    | 9 ++-------
  gcc/configure.ac | 2 --
- 2 files changed, 2 insertions(+), 9 deletions(-)
+ 3 files changed, 2 insertions(+), 15 deletions(-)
 
+diff --git a/gcc/config.in b/gcc/config.in
+index ea60c5b11fc5..5281a12a707c 100644
+--- a/gcc/config.in
++++ b/gcc/config.in
+@@ -67,12 +67,6 @@
+ #endif
+ 
+ 
+-/* Define to larger than one set the number of match.pd partitions to make. */
+-#ifndef USED_FOR_TARGET
+-#undef DEFAULT_MATCHPD_PARTITIONS
+-#endif
+-
+-
+ /* Define to larger than zero set the default stack clash protector size. */
+ #ifndef USED_FOR_TARGET
+ #undef DEFAULT_STK_CLASH_GUARD_SIZE
 diff --git a/gcc/configure b/gcc/configure
-index 2c124f1b0337..61c18a13ab7b 100755
+index 542d100c2b73..cc8247037569 100755
 --- a/gcc/configure
 +++ b/gcc/configure
-@@ -7914,11 +7914,6 @@ if (test $DEFAULT_MATCHPD_PARTITIONS -lt 1); then
+@@ -7937,11 +7937,6 @@ if (test $DEFAULT_MATCHPD_PARTITIONS -lt 1); then
  fi
  
  
@@ -36,29 +54,29 @@ index 2c124f1b0337..61c18a13ab7b 100755
  
  # Enable __cxa_atexit for C++.
  # Check whether --enable-__cxa_atexit was given.
-@@ -19873,7 +19868,7 @@ else
+@@ -19896,7 +19891,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 19876 "configure"
-+#line 19871 "configure"
+-#line 19899 "configure"
++#line 19894 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -19979,7 +19974,7 @@ else
+@@ -20002,7 +19997,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 19982 "configure"
-+#line 19977 "configure"
+-#line 20005 "configure"
++#line 20000 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
 diff --git a/gcc/configure.ac b/gcc/configure.ac
-index 526ce0665a3e..c15b65367419 100644
+index 31aa8566a3e7..d02ffc22a3a3 100644
 --- a/gcc/configure.ac
 +++ b/gcc/configure.ac
-@@ -932,8 +932,6 @@ if (test $DEFAULT_MATCHPD_PARTITIONS -lt 1); then
+@@ -954,8 +954,6 @@ if (test $DEFAULT_MATCHPD_PARTITIONS -lt 1); then
  		Cannot be negative.]))
  fi
  
@@ -68,5 +86,5 @@ index 526ce0665a3e..c15b65367419 100644
  
  # Enable __cxa_atexit for C++.
 -- 
-2.43.0
+2.44.0
 

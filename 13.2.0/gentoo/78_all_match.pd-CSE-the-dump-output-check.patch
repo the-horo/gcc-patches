@@ -1,9 +1,9 @@
 https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109927#c21
 
-From c256e2c80e56c4e015d8d7ca50fa01a6ed98a1eb Mon Sep 17 00:00:00 2001
+From 2d83fafb3f263544be09bf7dbde036e4a84f6d7c Mon Sep 17 00:00:00 2001
 From: Tamar Christina <tamar.christina@arm.com>
 Date: Fri, 5 May 2023 13:36:43 +0100
-Subject: [PATCH 04/14] match.pd: CSE the dump output check.
+Subject: [PATCH 03/15] match.pd: CSE the dump output check.
 
 This is a small improvement in QoL codegen for match.pd to save time not
 re-evaluating the condition for printing debug information in every function.
@@ -26,7 +26,7 @@ gcc/ChangeLog:
  1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/gcc/genmatch.cc b/gcc/genmatch.cc
-index 8937c76369cb..a0643aa37308 100644
+index 45e49c790b6d..a17ef8a23ed5 100644
 --- a/gcc/genmatch.cc
 +++ b/gcc/genmatch.cc
 @@ -3433,7 +3433,7 @@ dt_simplify::gen_1 (FILE *f, int indent, bool gimple, operand *result)
@@ -66,5 +66,5 @@ index 8937c76369cb..a0643aa37308 100644
    if (!gimple)
      fprintf_indent (f, 2, "if (TREE_SIDE_EFFECTS (t)) return false;\n");
 -- 
-2.43.0
+2.44.0
 

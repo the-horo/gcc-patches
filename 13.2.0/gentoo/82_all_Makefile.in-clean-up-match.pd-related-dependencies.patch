@@ -1,7 +1,7 @@
-From 88d7963056355a28adb9fc1b805752d422c2619e Mon Sep 17 00:00:00 2001
+From 2c1f550db00c7dd9abede5644a3acd915767e0ad Mon Sep 17 00:00:00 2001
 From: Alexander Monakov <amonakov@ispras.ru>
 Date: Fri, 5 May 2023 19:46:25 +0300
-Subject: [PATCH 08/14] Makefile.in: clean up match.pd-related dependencies
+Subject: [PATCH 07/15] Makefile.in: clean up match.pd-related dependencies
 
 Clean up confusing changes from the recent refactoring for
 parallel match.pd build.
@@ -56,5 +56,5 @@ index f0c34d00ecbc..fe3af5c8008c 100644
  s-gimple-match: build/genmatch$(build_exeext) \
  	    $(srcdir)/match.pd cfn-operators.pd
 -- 
-2.43.0
+2.44.0
 
