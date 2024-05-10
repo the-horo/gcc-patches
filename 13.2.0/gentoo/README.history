@@ -1,3 +1,8 @@
+16	10 May 2024
+
+	- 84_all_x86_PR110792-Early-clobber-issues-with-rot32di2.patch
+	- 85_all_x86_PR110792-Early-clobber-issues-with-rot32di2-test-fixup.patch
+
 15	7 Apr 2024
 
 	- 50_all_PR111632_system_cxx_headers_libcxx.patch
