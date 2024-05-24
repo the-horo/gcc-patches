@@ -1,0 +1,6 @@
+1       7 May 2024
+
+	+ 25_all_multilib_pure64.patch
+	+ 50_all_cpu_indicator.patch
+	+ 50_all_libssp_unconditionally.patch
+	+ 50_all_posix_memalign.patch
