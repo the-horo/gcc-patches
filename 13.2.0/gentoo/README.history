@@ -1,3 +1,7 @@
+17	8 June 2024
+
+	+ 93_all_ppc_PR97367-power7-cell-altivec.patch
+
 16	10 May 2024
 
 	- 84_all_x86_PR110792-Early-clobber-issues-with-rot32di2.patch
