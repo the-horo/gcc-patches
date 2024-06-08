@@ -1,6 +1,7 @@
 2	????
 
 	- 76_all_ppc_PR112868-no-checking-many.patch
+	+ 76_all_ppc_PR97367-power7-cell-altivec.patch
 
 1	7 May 2024
 
