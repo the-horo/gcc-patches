@@ -1,0 +1,206 @@
+https://gcc.gnu.org/PR115387
+https://inbox.sourceware.org/gcc-patches/430da3ad-59a6-4f16-b35f-8bef724a7ed7@gmail.com/T/#t
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <SRS0=SYw7=NM=intel.com=pan2.li@sourceware.org>
+Received: from mgamail.intel.com (mgamail.intel.com [198.175.65.14])
+	by sourceware.org (Postfix) with ESMTPS id 48A883858CDB
+	for <gcc-patches@gcc.gnu.org>; Mon, 10 Jun 2024 14:49:07 +0000 (GMT)
+DMARC-Filter: OpenDMARC Filter v1.4.2 sourceware.org 48A883858CDB
+Authentication-Results: sourceware.org; dmarc=pass (p=none dis=none) header.from=intel.com
+Authentication-Results: sourceware.org; spf=pass smtp.mailfrom=intel.com
+ARC-Filter: OpenARC Filter v1.0.0 sourceware.org 48A883858CDB
+Authentication-Results: server2.sourceware.org; arc=none smtp.remote-ip=198.175.65.14
+ARC-Seal: i=1; a=rsa-sha256; d=sourceware.org; s=key; t=1718030949; cv=none;
+	b=sYMAFxaXXHzkHsYoFI0HFGXWzujiQRXs1KA4PpQKerabnFz185hAazNZgv5HRn33NHy30a6CaFSGdNqMzI5rJ/uWP0t/IVSZPws+DkO9GCBPkgQLIHvRRf5J+uf7usxHf+quk0tjfzrDkHctT7riGqQjzSEAkBTwrKXd7X9aQ9k=
+ARC-Message-Signature: i=1; a=rsa-sha256; d=sourceware.org; s=key;
+	t=1718030949; c=relaxed/simple;
+	bh=p/hDLfesLAxds7UkloKeUvZGINWc0ydc/cnr4ptMBSU=;
+	h=DKIM-Signature:From:To:Subject:Date:Message-Id:MIME-Version; b=GtE3ODQcVtLdsf2+edm43ZWyfgTSrruAj3RQ1zIcTMeifKot7fY59t2YIAFrSyx/vKLMuPwocIQ8p3VmYLj4DB2f8ybXvEhBcx2pxlh5GNVmPxjGtJsnrv6p7oMG9CA6X/bns8vlMhr2CgwzHRba7bItkwFWjKkI8gbJz3v9zeo=
+ARC-Authentication-Results: i=1; server2.sourceware.org
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1718030948; x=1749566948;
+  h=from:to:cc:subject:date:message-id:mime-version:
+   content-transfer-encoding;
+  bh=p/hDLfesLAxds7UkloKeUvZGINWc0ydc/cnr4ptMBSU=;
+  b=biitKQIpbkCUKRo31CQVWz5tQ3QP6AsTulnDi3LB7cDTMJflku4VDWDx
+   Dnu97Pvn/2HzgfrZyN+1kVfGvLnehrErvG2qw3kZ2PGu0AiKrtnTRj0ED
+   UdyWa4+MQF5nj34UK92MRcA1Ovou3O89YdQ11EmVuL1KynSTtKgwo/d/9
+   JsYn3MkWZP6NjVgZteOu5xBZF+J3NxK61azjaUgP8LIxo1bmEKUMBgo0f
+   p0gXtZXjZkxtpcqzr++CtB6e4fKUHQK8z/FjOzaHvwIzmxdoEcptRGtl9
+   v+2kXKMcvMQGZZlsBfFIewmNKjK6qUYGrDKl1wltMZMkeijuudmObyhaq
+   A==;
+X-CSE-ConnectionGUID: JaJ1NR5jSimBRrZvjuM+Lw==
+X-CSE-MsgGUID: Q6rSZfGaQfOHvXT9LPs02g==
+X-IronPort-AV: E=McAfee;i="6600,9927,11099"; a="18526139"
+X-IronPort-AV: E=Sophos;i="6.08,227,1712646000"; 
+   d="scan'208";a="18526139"
+Received: from orviesa002.jf.intel.com ([10.64.159.142])
+  by orvoesa106.jf.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 10 Jun 2024 07:49:07 -0700
+X-CSE-ConnectionGUID: +SJ6B8QPQfWwhjgjPJujEw==
+X-CSE-MsgGUID: eHhYmO22SKyPWaJe7LW77Q==
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="6.08,227,1712646000"; 
+   d="scan'208";a="69872329"
+Received: from shvmail03.sh.intel.com ([10.239.245.20])
+  by orviesa002.jf.intel.com with ESMTP; 10 Jun 2024 07:49:04 -0700
+Received: from pli-ubuntu.sh.intel.com (pli-ubuntu.sh.intel.com [10.239.159.47])
+	by shvmail03.sh.intel.com (Postfix) with ESMTP id E43A71007C1D;
+	Mon, 10 Jun 2024 22:49:02 +0800 (CST)
+From: pan2.li@intel.com
+To: gcc-patches@gcc.gnu.org
+Cc: juzhe.zhong@rivai.ai,
+	kito.cheng@gmail.com,
+	richard.guenther@gmail.com,
+	Pan Li <pan2.li@intel.com>
+Subject: [PATCH v1] Widening-Mul: Fix one ICE of gcall insertion for PHI match
+Date: Mon, 10 Jun 2024 22:49:01 +0800
+Message-Id: <20240610144901.3723532-1-pan2.li@intel.com>
+X-Mailer: git-send-email 2.34.1
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+X-Spam-Status: No, score=-11.4 required=5.0 tests=BAYES_00,DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU,DKIM_VALID_EF,GIT_PATCH_0,KAM_SHORT,SPF_HELO_NONE,SPF_NONE,TXREP,T_SCC_BODY_TEXT_LINE autolearn=ham autolearn_force=no version=3.4.6
+X-Spam-Checker-Version: SpamAssassin 3.4.6 (2021-04-09) on server2.sourceware.org
+List-Id: <gcc-patches.gcc.gnu.org>
+
+From: Pan Li <pan2.li@intel.com>
+
+When enabled the PHI handing for COND_EXPR,  we need to insert the gcall
+to replace the PHI node.  Unfortunately,  I made a mistake that insert
+the gcall to before the last stmt of the bb.  See below gimple,  the PHI
+is located at no.1 but we insert the gcall (aka no.9) to the end of
+the bb.  Then the use of _9 in no.2 will have no def and will trigger
+ICE when verify_ssa.
+
+  1. # _9 = PHI <_3(4), 18446744073709551615(3)> // The PHI node to be deleted.
+  2. prephitmp_36 = (char *) _9;
+  3. buf.write_base = string_13(D);
+  4. buf.write_ptr = string_13(D);
+  5. buf.write_end = prephitmp_36;
+  6. buf.written = 0;
+  7. buf.mode = 3;
+  8. _7 = buf.write_end;
+  9. _9 = .SAT_ADD (string.0_2, maxlen_15(D));   // Insert gcall to last bb by mistake
+
+This patch would like to insert the gcall to before the start of the bb
+stmt.  To ensure the possible use of PHI_result will have a def exists.
+After this patch the above gimple will be:
+
+  0. _9 = .SAT_ADD (string.0_2, maxlen_15(D));   // Insert gcall to start bb by mistake
+  1. # _9 = PHI <_3(4), 18446744073709551615(3)> // The PHI node to be deleted.
+  2. prephitmp_36 = (char *) _9;
+  3. buf.write_base = string_13(D);
+  4. buf.write_ptr = string_13(D);
+  5. buf.write_end = prephitmp_36;
+  6. buf.written = 0;
+  7. buf.mode = 3;
+  8. _7 = buf.write_end;
+
+The below test suites are passed for this patch:
+* The rv64gcv fully regression test with newlib.
+* The rv64gcv build with glibc.
+* The x86 regression test with newlib.
+* The x86 bootstrap test with newlib.
+
+	PR target/115387
+
+gcc/ChangeLog:
+
+	* tree-ssa-math-opts.cc (math_opts_dom_walker::after_dom_children): Take
+	the gsi of start_bb instead of last_bb.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/pr115387-1.c: New test.
+	* gcc.target/riscv/pr115387-2.c: New test.
+
+Signed-off-by: Pan Li <pan2.li@intel.com>
+---
+ gcc/testsuite/gcc.target/riscv/pr115387-1.c | 35 +++++++++++++++++++++
+ gcc/testsuite/gcc.target/riscv/pr115387-2.c | 18 +++++++++++
+ gcc/tree-ssa-math-opts.cc                   |  2 +-
+ 3 files changed, 54 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr115387-1.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr115387-2.c
+
+diff --git a/gcc/testsuite/gcc.target/riscv/pr115387-1.c b/gcc/testsuite/gcc.target/riscv/pr115387-1.c
+new file mode 100644
+index 00000000000..a1c926977c4
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr115387-1.c
+@@ -0,0 +1,35 @@
++/* Test there is no ICE when compile.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gcv -mabi=lp64d -O3" } */
++
++#define PRINTF_CHK 0x34
++
++typedef unsigned long uintptr_t;
++
++struct __printf_buffer {
++  char *write_ptr;
++  int status;
++};
++
++extern void __printf_buffer_init_end (struct __printf_buffer *, char *, char *);
++
++void
++test (char *string, unsigned long maxlen, unsigned mode_flags)
++{
++  struct __printf_buffer buf;
++
++  if ((mode_flags & PRINTF_CHK) != 0)
++    {
++      string[0] = '\0';
++      uintptr_t end;
++
++      if (__builtin_add_overflow ((uintptr_t) string, maxlen, &end))
++	end = -1;
++
++      __printf_buffer_init_end (&buf, string, (char *) end);
++    }
++  else
++    __printf_buffer_init_end (&buf, string, (char *) ~(uintptr_t) 0);
++
++  *buf.write_ptr = '\0';
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/pr115387-2.c b/gcc/testsuite/gcc.target/riscv/pr115387-2.c
+new file mode 100644
+index 00000000000..7183bf18dfd
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr115387-2.c
+@@ -0,0 +1,18 @@
++/* Test there is no ICE when compile.  */
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gcv -mabi=lp64d -O3" } */
++
++#include <stddef.h>
++#include <stdint-gcc.h>
++
++char *
++test (char *string, size_t maxlen)
++{
++  string[0] = '\0';
++  uintptr_t end;
++
++  if (__builtin_add_overflow ((uintptr_t) string, maxlen, &end))
++    end = -1;
++
++  return (char *) end;
++}
+diff --git a/gcc/tree-ssa-math-opts.cc b/gcc/tree-ssa-math-opts.cc
+index 173b0366f5e..fbb8e0ea306 100644
+--- a/gcc/tree-ssa-math-opts.cc
++++ b/gcc/tree-ssa-math-opts.cc
+@@ -6102,7 +6102,7 @@ math_opts_dom_walker::after_dom_children (basic_block bb)
+   for (gphi_iterator psi = gsi_start_phis (bb); !gsi_end_p (psi);
+     gsi_next (&psi))
+     {
+-      gimple_stmt_iterator gsi = gsi_last_bb (bb);
++      gimple_stmt_iterator gsi = gsi_start_bb (bb);
+       match_unsigned_saturation_add (&gsi, psi.phi ());
+     }
+ 
+-- 
+2.34.1
