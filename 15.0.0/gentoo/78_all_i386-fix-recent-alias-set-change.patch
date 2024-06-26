@@ -1,0 +1,95 @@
+From 72a4d2d437782afa975f9b29c3ab4a1826ad0cd6 Mon Sep 17 00:00:00 2001
+From: Sam James <sam@gentoo.org>
+Date: Wed, 26 Jun 2024 12:54:55 +0100
+Subject: [PATCH 2/2] i386: fix recent alias set change
+
+Before r15-1599-g63512c72df09b4, we would create a new alias set, but now
+we use -1. Go back to using ix86_GOT_alias_set.
+
+(This is a hack which isn't the cleanest way of fixing it.)
+
+Bug: https://gcc.gnu.org/PR115635
+Bug: https://gcc.gnu.org/PR115661
+---
+ gcc/config/i386/i386-expand.cc |  2 +-
+ gcc/config/i386/i386-expand.h  |  1 +
+ gcc/config/i386/i386.cc        | 17 ++++++++++++++---
+ 3 files changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/config/i386/i386-expand.cc b/gcc/config/i386/i386-expand.cc
+index 5e0173bc7a84..3345f40ad85d 100644
+--- a/gcc/config/i386/i386-expand.cc
++++ b/gcc/config/i386/i386-expand.cc
+@@ -408,7 +408,7 @@ ix86_expand_move (machine_mode mode, rtx operands[])
+ 				 : UNSPEC_GOT));
+ 	  op1 = gen_rtx_CONST (Pmode, op1);
+ 	  op1 = gen_const_mem (Pmode, op1);
+-	  set_mem_alias_set (op1, GOT_ALIAS_SET);
++	  set_mem_alias_set (op1, ix86_GOT_alias_set ());
+ 	}
+       else
+ 	{
+diff --git a/gcc/config/i386/i386-expand.h b/gcc/config/i386/i386-expand.h
+index 5e02df1706df..56bee29253ba 100644
+--- a/gcc/config/i386/i386-expand.h
++++ b/gcc/config/i386/i386-expand.h
+@@ -34,6 +34,7 @@ struct expand_vec_perm_d
+ };
+ 
+ rtx legitimize_tls_address (rtx x, enum tls_model model, bool for_mov);
++alias_set_type ix86_GOT_alias_set (void);
+ rtx legitimize_pic_address (rtx orig, rtx reg);
+ 
+ bool insn_defines_reg (unsigned int regno1, unsigned int regno2,
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index 1f71ed04be67..62fca080f2f5 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -11823,6 +11823,17 @@ constant_address_p (rtx x)
+ }
+ 
+ 
++/* Return a unique alias set for the GOT.  */
++
++alias_set_type
++ix86_GOT_alias_set (void)
++{
++  static alias_set_type set = -1;
++  if (set == -1)
++    set = new_alias_set ();
++  return set;
++}
++
+ /* Return a legitimate reference for ORIG (an address) using the
+    register REG.  If REG is 0, a new pseudo is generated.
+ 
+@@ -11925,7 +11936,7 @@ legitimize_pic_address (rtx orig, rtx reg)
+ 				    UNSPEC_GOTPCREL);
+ 	  new_rtx = gen_rtx_CONST (Pmode, new_rtx);
+ 	  new_rtx = gen_const_mem (Pmode, new_rtx);
+-	  set_mem_alias_set (new_rtx, GOT_ALIAS_SET);
++	  set_mem_alias_set (new_rtx, ix86_GOT_alias_set ());
+ 	}
+       else
+ 	{
+@@ -11947,7 +11958,7 @@ legitimize_pic_address (rtx orig, rtx reg)
+ 	    new_rtx = gen_rtx_PLUS (Pmode, pic_offset_table_rtx, new_rtx);
+ 
+ 	  new_rtx = gen_const_mem (Pmode, new_rtx);
+-	  set_mem_alias_set (new_rtx, GOT_ALIAS_SET);
++	  set_mem_alias_set (new_rtx, ix86_GOT_alias_set ());
+ 	}
+ 
+       new_rtx = copy_to_suggested_reg (new_rtx, reg, Pmode);
+@@ -12324,7 +12335,7 @@ legitimize_tls_address (rtx x, enum tls_model model, bool for_mov)
+       if (pic)
+ 	off = gen_rtx_PLUS (tp_mode, pic, off);
+       off = gen_const_mem (tp_mode, off);
+-      set_mem_alias_set (off, GOT_ALIAS_SET);
++      set_mem_alias_set (off, ix86_GOT_alias_set ());
+ 
+       if (TARGET_64BIT || TARGET_ANY_GNU_TLS)
+ 	{
+-- 
+2.45.2
+
