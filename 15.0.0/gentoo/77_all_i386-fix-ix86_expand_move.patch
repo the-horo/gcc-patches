@@ -9,6 +9,8 @@ for non-PECOFF targets, so the else branch would get taken.
 (This is a hack which doesn't work for PECOFF targets but fixes miscompilations
 on ELF.)
 
+This partially reverts commit r15-1599-g63512c72df09b4.
+
 Bug: https://gcc.gnu.org/PR115635
 Bug: https://gcc.gnu.org/PR115661
 ---

@@ -8,6 +8,8 @@ we use -1. Go back to using ix86_GOT_alias_set.
 
 (This is a hack which isn't the cleanest way of fixing it.)
 
+This partially reverts commit r15-1599-g63512c72df09b4.
+
 Bug: https://gcc.gnu.org/PR115635
 Bug: https://gcc.gnu.org/PR115661
 ---
