@@ -1,3 +1,7 @@
+5	15 July 2024
+
+	+ 78_all_gcc_don-t-enable-fext-dce-with-O2-for-now.patch
+
 4	16 June 2024
 
 	- 77_all_PR115387.patch

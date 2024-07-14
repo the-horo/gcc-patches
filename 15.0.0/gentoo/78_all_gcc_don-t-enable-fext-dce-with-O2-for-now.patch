@@ -1,0 +1,34 @@
+From 86de2fd7550f75a318aa9819b115487cd850b4fc Mon Sep 17 00:00:00 2001
+From: Sam James <sam@gentoo.org>
+Date: Mon, 15 Jul 2024 00:32:18 +0100
+Subject: [PATCH] gcc: don't enable -fext-dce with -O2 for now
+
+There's too many bugs involving it for now.
+
+    gcc/
+            * opts.cc (default_options_table): Don't enable ext-dce at -O2
+
+Bug: https://gcc.gnu.org/PR115876
+Bug: https://gcc.gnu.org/PR115877
+Bug: https://gcc.gnu.org/PR115912
+Bug: https://gcc.gnu.org/PR115916
+Bug: https://gcc.gnu.org/PR115927
+---
+ gcc/opts.cc | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/gcc/opts.cc b/gcc/opts.cc
+index be90a632338f..e1a1bdf15822 100644
+--- a/gcc/opts.cc
++++ b/gcc/opts.cc
+@@ -634,7 +634,6 @@ static const struct default_options default_options_table[] =
+     { OPT_LEVELS_2_PLUS, OPT_fdevirtualize, NULL, 1 },
+     { OPT_LEVELS_2_PLUS, OPT_fdevirtualize_speculatively, NULL, 1 },
+     { OPT_LEVELS_2_PLUS, OPT_fexpensive_optimizations, NULL, 1 },
+-    { OPT_LEVELS_2_PLUS, OPT_fext_dce, NULL, 1 },
+     { OPT_LEVELS_2_PLUS, OPT_fgcse, NULL, 1 },
+     { OPT_LEVELS_2_PLUS, OPT_fhoist_adjacent_loads, NULL, 1 },
+     { OPT_LEVELS_2_PLUS, OPT_findirect_inlining, NULL, 1 },
+-- 
+2.45.2
+
