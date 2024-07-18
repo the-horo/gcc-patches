@@ -1,13 +1,109 @@
 https://gcc.gnu.org/PR97367
-https://inbox.sourceware.org/gcc-patches/20240308.123342.1112119677226246836.rene@exactcode.de/
+https://inbox.sourceware.org/gcc-patches/5f2b5d5e-a682-4084-b70e-89929f4cc6dc@bergner.org/T/#u
+
+From git@z Thu Jan  1 00:00:00 1970
+Subject: [PATCH v2] rs6000: Fix .machine cpu selection w/ altivec [PR97367]
+From: Peter Bergner <pshop@bergner.org>
+Date: Fri, 12 Jul 2024 16:48:29 -0500
+Message-Id: <5f2b5d5e-a682-4084-b70e-89929f4cc6dc@bergner.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+René's patch seems to have stalled, so here is an updated version of the
+patch with the requested changes to his patch.
+
+I'll note I have added an additional code change, which is to also emit a
+".machine altivec" if Altivec is enabled.  The problem this fixes is for
+cpus like the G5, which is basically a power4 plus an Altivec unit, its
+".machine power4" doesn't enable the assembler to recognize Altivec insns.
+That isn't a problem if you use gcc -mcpu=G5 to assemble the assembler file,
+since gcc passes -maltivec to the assembler.  However, if you try to assemble
+the assembler file with as by hand, you'll get "unrecognized opcode" errors.
+I did not do the same for VSX, since all ".machine <cpu>" for cpus that
+support VSX already enable VSX insn recognition, so it's not needed.
+
+
+rs6000: Fix .machine cpu selection w/ altivec [PR97367]
+
+There are various non-IBM CPUs with altivec, so we cannot use that
+flag to determine which .machine cpu to use, so ignore it.
+Emit an additional ".machine altivec" if Altivec is enabled so
+that the assembler doesn't require an explicit -maltivec option
+to assemble any Altivec instructions for those targets where
+the ".machine cpu" is insufficient to enable Altivec.  For example,
+-mcpu=G5 emits a ".machine power4".
+
+This passed bootstrap and regtesting on powrpc64-linux (running the testsuite
+in both 32-bit and 64-bit modes) with no regressions.
+
+Ok for trunk and the release branches after some trunk burn-in time?
+
+Peter
+
+
+2024-07-12  René Rebe  <rene@exactcode.de>
+	    Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+	PR target/97367
+	* config/rs6000/rs6000.c (rs6000_machine_from_flags): Do not consider
+	OPTION_MASK_ALTIVEC.
+	(emit_asm_machine): For Altivec compiles, emit a ".machine altivec".
+
+gcc/testsuite/
+	PR target/97367
+	* gcc.target/powerpc/pr97367.c: New test.
+
+Signed-of-by: René Rebe <rene@exactcode.de>
+---
+ gcc/config/rs6000/rs6000.cc                |  5 ++++-
+ gcc/testsuite/gcc.target/powerpc/pr97367.c | 13 +++++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr97367.c
+
+diff --git a/gcc/config/rs6000/rs6000.cc b/gcc/config/rs6000/rs6000.cc
+index 2cbea6ea2d7..2cb8f35739b 100644
 --- a/gcc/config/rs6000/rs6000.cc
 +++ b/gcc/config/rs6000/rs6000.cc
-@@ -5869,7 +5869,7 @@ rs6000_machine_from_flags (void)
+@@ -5888,7 +5888,8 @@ rs6000_machine_from_flags (void)
    HOST_WIDE_INT flags = rs6000_isa_flags;
  
    /* Disable the flags that should never influence the .machine selection.  */
 -  flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL);
-+  flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ALTIVEC | OPTION_MASK_ISEL);
++  flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL
++	     | OPTION_MASK_ALTIVEC);
  
    if ((flags & (ISA_3_1_MASKS_SERVER & ~ISA_3_0_MASKS_SERVER)) != 0)
      return "power10";
+@@ -5913,6 +5914,8 @@ void
+ emit_asm_machine (void)
+ {
+   fprintf (asm_out_file, "\t.machine %s\n", rs6000_machine);
++  if (TARGET_ALTIVEC)
++    fprintf (asm_out_file, "\t.machine altivec\n");
+ }
+ #endif
+ 
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr97367.c b/gcc/testsuite/gcc.target/powerpc/pr97367.c
+new file mode 100644
+index 00000000000..f9118dbcdec
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr97367.c
+@@ -0,0 +1,13 @@
++/* PR target/97367 */
++/* { dg-options "-mdejagnu-cpu=G5" } */
++
++/* Verify we emit a ".machine power4" and ".machine altivec" rather
++   than a ".machine power7".  */
++
++int dummy (void)
++{
++  return 0;
++}
++
++/* { dg-final { scan-assembler {\.\mmachine power4\M} } } */
++/* { dg-final { scan-assembler {\.\mmachine altivec\M} } } */
+-- 
+2.45.2
+
