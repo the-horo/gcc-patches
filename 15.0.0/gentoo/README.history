@@ -2,6 +2,7 @@
 
 	- 32_all_phi-opt-Fix-for-non-const-functions-for-factor_out_c.patch
 	- 33_all_phiopt-Reject-non-gimple-val-inside-factor_out_condi.patch
+	+ 09_all_esysroot.patch
 
 10	19 August 2024
 
