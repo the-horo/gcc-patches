@@ -1,5 +1,6 @@
 ?	????
 
+	U 04_all_nossp-on-nostdlib.patch
 	- 07_all_libiberty-asprintf.patch
 	- 78_all_gcc_don-t-enable-fext-dce-with-O2-for-now.patch
 
