@@ -1,6 +1,7 @@
-10	????
+10	19 August 2024
 
-	+ 32_all_genoutput-speedup.patch
+	+ 32_all_phi-opt-Fix-for-non-const-functions-for-factor_out_c.patch
+	+ 33_all_phiopt-Reject-non-gimple-val-inside-factor_out_condi.patch
 
 9	11 August 2024
 
