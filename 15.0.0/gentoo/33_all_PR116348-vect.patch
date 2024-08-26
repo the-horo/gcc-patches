@@ -1,0 +1,78 @@
+https://gcc.gnu.org/PR116348
+https://inbox.sourceware.org/gcc-patches/20240825185348.37025-1-xry111@xry111.site/T/#u
+
+From cc68092ef1bb1134f6d8ddf0281323658a4358ae Mon Sep 17 00:00:00 2001
+Message-ID: <cc68092ef1bb1134f6d8ddf0281323658a4358ae.1724653336.git.sam@gentoo.org>
+From: Xi Ruoyao <xry111@xry111.site>
+Date: Mon, 26 Aug 2024 02:53:13 +0800
+Subject: [PATCH] vect: Fix STMT_VINFO_DEF_TYPE check for odd/even widen mult
+ [PR116348]
+
+After fixing PR116142 some code started to trigger an ICE with -O3
+-march=znver4.  Per Richard Biener who actually made this fix:
+
+"supportable_widening_operation fails at transform time - that's likely
+because vectorizable_reduction "puns" defs to internal_def"
+
+so the check should use STMT_VINFO_REDUC_DEF instead of checking if
+STMT_VINFO_DEF_TYPE is vect_reduction_def.
+
+gcc/ChangeLog:
+
+	PR tree-optimization/PR116348
+	* tree-vect-stmts.cc (supportable_widening_operation): Use
+	STMT_VINFO_REDUC_DEF (x) instead of
+	STMT_VINFO_DEF_TYPE (x) == vect_reduction_def.
+
+gcc/testsuite/ChangeLog:
+
+	PR tree-optimization/PR116348
+	* gcc.c-torture/compile/pr116438.c: New test.
+
+Co-authored-by: Richard Biener <rguenther@suse.de>
+---
+ gcc/testsuite/gcc.c-torture/compile/pr116438.c | 14 ++++++++++++++
+ gcc/tree-vect-stmts.cc                         |  3 +--
+ 2 files changed, 15 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.c-torture/compile/pr116438.c
+
+diff --git a/gcc/testsuite/gcc.c-torture/compile/pr116438.c b/gcc/testsuite/gcc.c-torture/compile/pr116438.c
+new file mode 100644
+index 000000000000..97ab0181ab8b
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/compile/pr116438.c
+@@ -0,0 +1,14 @@
++/* { dg-additional-options "-march=znver4" { target x86_64-*-* i?86-*-* } } */
++
++int *a;
++int b;
++long long c, d;
++void
++e (int f)
++{
++  for (; f; f++)
++    {
++      d += (long long)a[f] * b;
++      c += (long long)a[f] * 3;
++    }
++}
+diff --git a/gcc/tree-vect-stmts.cc b/gcc/tree-vect-stmts.cc
+index 385e63163c24..9eb73a599339 100644
+--- a/gcc/tree-vect-stmts.cc
++++ b/gcc/tree-vect-stmts.cc
+@@ -14193,8 +14193,7 @@ supportable_widening_operation (vec_info *vinfo,
+              by STMT is only directly used in the reduction statement.  */
+ 	  tree lhs = gimple_assign_lhs (vect_orig_stmt (stmt_info)->stmt);
+ 	  stmt_vec_info use_stmt_info = loop_info->lookup_single_use (lhs);
+-	  if (use_stmt_info
+-	      && STMT_VINFO_DEF_TYPE (use_stmt_info) == vect_reduction_def)
++	  if (use_stmt_info && STMT_VINFO_REDUC_DEF (use_stmt_info))
+ 	    return true;
+         }
+       c1 = VEC_WIDEN_MULT_LO_EXPR;
+
+base-commit: b4ac2c23d8745d98984954e88f02aa73f1c3594b
+prerequisite-patch-id: 743f4e4444f9cac24e67abce2bda52d6a421d870
+-- 
+2.46.0
+

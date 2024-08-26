@@ -1,0 +1,78 @@
+https://gcc.gnu.org/PR116470
+https://inbox.sourceware.org/gcc-patches/AS1PR01MB946587924CF9EFA4950ECBAFE48B2@AS1PR01MB9465.eurprd01.prod.exchangelabs.com/
+
+From 9c7050effd98d868d59fbd5ec7eeff1160eb05b8 Mon Sep 17 00:00:00 2001
+Message-ID: <9c7050effd98d868d59fbd5ec7eeff1160eb05b8.1724653254.git.sam@gentoo.org>
+From: Bernd Edlinger <bernd.edlinger@hotmail.de>
+Date: Mon, 26 Aug 2024 05:46:16 +0200
+Subject: [PATCH] Fix bootstap-errors due to enabling -gvariable-location-views
+
+This recent change triggered various bootsteap-errors, mostly on
+x86 targets because line info advance address entries were output
+in the wrong section table.
+The switch to the wrong line table happened in dwarfout_set_ignored_loc.
+It must use the same section as the earlier called
+dwarf2out_switch_text_section.
+
+But also ft32-elf was affected, because the assembler choked on
+something simple as ".2byte .LM2-.LM1", but fortunately it is
+able to use native location views, the configure test was just
+not executed because the ft32 "nop" instruction was missing.
+
+gcc/ChangeLog:
+
+PR debug/116470
+	* configure.ac: Add the "nop" instruction for cpu type ft32.
+	* configure: Regenerate.
+	* dwarf2out.cc (dwarf2out_set_ignored_loc): Use the correct
+	line info section.
+---
+ gcc/configure    | 2 +-
+ gcc/configure.ac | 2 +-
+ gcc/dwarf2out.cc | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/configure b/gcc/configure
+index 557ea5fa3ac9..3d301b6ecd3d 100755
+--- a/gcc/configure
++++ b/gcc/configure
+@@ -31398,7 +31398,7 @@ esac
+ case "$cpu_type" in
+   aarch64 | alpha | arc | arm | avr | bfin | cris | csky | i386 | loongarch | m32c \
+   | m68k | microblaze | mips | nds32 | nios2 | pa | riscv | rs6000 | score | sparc \
+-  | visium | xstormy16 | xtensa)
++  | visium | xstormy16 | xtensa | ft32)
+     insn="nop"
+     ;;
+   ia64 | s390)
+diff --git a/gcc/configure.ac b/gcc/configure.ac
+index eaa01d0d7e56..8a2d2b0438e7 100644
+--- a/gcc/configure.ac
++++ b/gcc/configure.ac
+@@ -5610,7 +5610,7 @@ esac
+ case "$cpu_type" in
+   aarch64 | alpha | arc | arm | avr | bfin | cris | csky | i386 | loongarch | m32c \
+   | m68k | microblaze | mips | nds32 | nios2 | pa | riscv | rs6000 | score | sparc \
+-  | visium | xstormy16 | xtensa)
++  | visium | xstormy16 | xtensa | ft32)
+     insn="nop"
+     ;;
+   ia64 | s390)
+diff --git a/gcc/dwarf2out.cc b/gcc/dwarf2out.cc
+index 633900b035fe..3f040da33a63 100644
+--- a/gcc/dwarf2out.cc
++++ b/gcc/dwarf2out.cc
+@@ -28939,7 +28939,7 @@ dwarf2out_set_ignored_loc (unsigned int line, unsigned int column,
+   dw_fde_ref fde = cfun->fde;
+ 
+   fde->ignored_debug = false;
+-  set_cur_line_info_table (function_section (fde->decl));
++  set_cur_line_info_table (current_function_section ());
+ 
+   dwarf2out_source_line (line, column, filename, 0, true);
+ }
+
+base-commit: b4ac2c23d8745d98984954e88f02aa73f1c3594b
+-- 
+2.46.0
+

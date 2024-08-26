@@ -1,8 +1,10 @@
-11	????
+11	26 August 2024
 
 	- 32_all_phi-opt-Fix-for-non-const-functions-for-factor_out_c.patch
 	- 33_all_phiopt-Reject-non-gimple-val-inside-factor_out_condi.patch
 	+ 09_all_esysroot.patch
+	+ 32_all_PR116470-debug-bootstrap.patch
+	+ 33_all_PR116348-vect.patch
 
 10	19 August 2024
 
