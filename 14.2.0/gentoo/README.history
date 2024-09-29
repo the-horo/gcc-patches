@@ -22,3 +22,4 @@
 	+ 29_all_msgfmt-libstdc++-link.patch
 	+ 30_all_tar_libstdc++-link.patch
 	+ 77_all_m2_docs_sandbox.patch
+	+ 78_all_PR115917-ada-lto.patch
