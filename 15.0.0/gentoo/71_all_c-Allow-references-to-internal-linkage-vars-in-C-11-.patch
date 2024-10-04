@@ -1,0 +1,96 @@
+From 923bd335a44b1b556d705a7f1d36a2e9c06d9c5c Mon Sep 17 00:00:00 2001
+Message-ID: <923bd335a44b1b556d705a7f1d36a2e9c06d9c5c.1728034006.git.sam@gentoo.org>
+From: Nathaniel Shead <nathanieloshead@gmail.com>
+Date: Fri, 4 Oct 2024 12:41:49 +1000
+Subject: [PATCH 1/2] c++: Allow references to internal-linkage vars in C++11
+ [PR113266]
+
+[temp.arg.nontype] changed in C++11 to allow naming internal-linkage
+variables and functions.  We currently already handle internal-linkage
+functions, but variables were missed; this patch updates this.
+
+	PR c++/113266
+	PR c++/116911
+
+gcc/cp/ChangeLog:
+
+	* parser.cc (cp_parser_template_argument): Allow
+	internal-linkage variables since C++11.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/nontype6.C: New test.
+
+Signed-off-by: Nathaniel Shead <nathanieloshead@gmail.com>
+---
+ gcc/cp/parser.cc                      | 17 ++++++++++++-----
+ gcc/testsuite/g++.dg/cpp0x/nontype6.C | 19 +++++++++++++++++++
+ 2 files changed, 31 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/nontype6.C
+
+diff --git a/gcc/cp/parser.cc b/gcc/cp/parser.cc
+index 08f9c89f1f0..e758ddeb1d5 100644
+--- a/gcc/cp/parser.cc
++++ b/gcc/cp/parser.cc
+@@ -19864,9 +19864,11 @@ cp_parser_template_argument (cp_parser* parser)
+ 
+      -- the name of a non-type template-parameter; or
+ 
+-     -- the name of an object or function with external linkage...
++     -- the name of an object or function with external (or internal,
++	since C++11) linkage...
+ 
+-     -- the address of an object or function with external linkage...
++     -- the address of an object or function with external (or internal,
++	since C++11) linkage...
+ 
+      -- a pointer to member...  */
+   /* Look for a non-type template parameter.  */
+@@ -19929,11 +19931,16 @@ cp_parser_template_argument (cp_parser* parser)
+ 	    probe = TREE_OPERAND (probe, 1);
+ 	  if (VAR_P (probe))
+ 	    {
+-	      /* A variable without external linkage might still be a
++	      /* A variable without valid linkage might still be a
+ 		 valid constant-expression, so no error is issued here
+ 		 if the external-linkage check fails.  */
+-	      if (!address_p && !DECL_EXTERNAL_LINKAGE_P (probe))
+-		cp_parser_simulate_error (parser);
++	      if (!address_p && cxx_dialect < cxx17)
++		{
++		  linkage_kind linkage = decl_linkage (probe);
++		  if (linkage != lk_external
++		      && (cxx_dialect < cxx11 || linkage != lk_internal))
++		    cp_parser_simulate_error (parser);
++		}
+ 	    }
+ 	  else if (is_overloaded_fn (argument))
+ 	    /* All overloaded functions are allowed; if the external
+diff --git a/gcc/testsuite/g++.dg/cpp0x/nontype6.C b/gcc/testsuite/g++.dg/cpp0x/nontype6.C
+new file mode 100644
+index 00000000000..5543d1e8b6d
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/nontype6.C
+@@ -0,0 +1,19 @@
++// PR c++/113266, PR c++/116911
++// { dg-do compile }
++
++template <int &> struct a {};
++static int guard1;
++a<guard1> b;  // { dg-error "constant-expression|invalid" "" { target c++98_only } }
++
++namespace {
++  int guard2;
++}
++a<guard2> c;  // OK in C++98 because guard2 has external linkage
++              // OK since C++11 because we can refer to an internal linkage decl
++
++void nolinkage() {
++  static int guard3;
++  a<guard3> d;  // { dg-error "constant-expression|invalid" "" { target c++98_only } }
++  // { dg-error "constant expression|no linkage" "" { target { c++11 && c++14_down } } .-1 }
++  // OK since C++17 since we can now refer to no-linkage decls
++}
+-- 
+2.46.2
+
