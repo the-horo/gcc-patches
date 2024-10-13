@@ -1,3 +1,8 @@
+16	13 October 2024
+
+	+ 70_all_PR116506-coro.patch
+	+ 71_all_PR116914-coro.patch
+
 15	7 October 2024
 
 	- 71_all_c-Allow-references-to-internal-linkage-vars-in-C-11-.patch
