@@ -1,0 +1,94 @@
+https://gcc.gnu.org/PR17192
+
+From 70f59d2a1c51bde085d8fc7df002918851e76c9c Mon Sep 17 00:00:00 2001
+From: "Cui, Lili" <lili.cui@intel.com>
+Date: Thu, 17 Oct 2024 08:50:38 +0800
+Subject: [PATCH] Support andn_optab for x86
+
+Add new andn pattern to match the new optab added by
+r15-1890-gf379596e0ba99d. Only enable 64bit, 128bit and
+256bit vector ANDN, X86-64 has mask mov instruction when
+avx512 is enabled.
+
+gcc/ChangeLog:
+
+	* config/i386/sse.md (andn<mode>3): New.
+	* config/i386/mmx.md (andn<mode>3): New.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.target/i386/vect-cmp.C: New test.
+---
+ gcc/config/i386/mmx.md                   |  7 +++++++
+ gcc/config/i386/sse.md                   |  7 +++++++
+ gcc/testsuite/g++.target/i386/vect-cmp.C | 23 +++++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
+ create mode 100644 gcc/testsuite/g++.target/i386/vect-cmp.C
+
+diff --git a/gcc/config/i386/mmx.md b/gcc/config/i386/mmx.md
+index 9d2a82c598e5..ef4ed8b501a1 100644
+--- a/gcc/config/i386/mmx.md
++++ b/gcc/config/i386/mmx.md
+@@ -4467,6 +4467,13 @@
+   operands[0] = lowpart_subreg (V16QImode, operands[0], <MODE>mode);
+ })
+ 
++(define_expand "andn<mode>3"
++  [(set (match_operand:MMXMODEI 0 "register_operand")
++        (and:MMXMODEI
++          (not:MMXMODEI (match_operand:MMXMODEI 1 "register_operand"))
++          (match_operand:MMXMODEI 2 "register_operand")))]
++  "TARGET_SSE2")
++
+ (define_insn "mmx_andnot<mode>3"
+   [(set (match_operand:MMXMODEI 0 "register_operand" "=y,x,x,v")
+ 	(and:MMXMODEI
+diff --git a/gcc/config/i386/sse.md b/gcc/config/i386/sse.md
+index a45b50ad7324..7be313346677 100644
+--- a/gcc/config/i386/sse.md
++++ b/gcc/config/i386/sse.md
+@@ -18438,6 +18438,13 @@
+ 	  (match_operand:VI_AVX2 2 "vector_operand")))]
+   "TARGET_SSE2")
+ 
++(define_expand "andn<mode>3"
++  [(set (match_operand:VI 0 "register_operand")
++	(and:VI
++	  (not:VI (match_operand:VI 2 "register_operand"))
++	  (match_operand:VI 1 "register_operand")))]
++  "TARGET_SSE2")
++
+ (define_expand "<sse2_avx2>_andnot<mode>3_mask"
+   [(set (match_operand:VI48_AVX512VL 0 "register_operand")
+ 	(vec_merge:VI48_AVX512VL
+diff --git a/gcc/testsuite/g++.target/i386/vect-cmp.C b/gcc/testsuite/g++.target/i386/vect-cmp.C
+new file mode 100644
+index 000000000000..c154474fa51c
+--- /dev/null
++++ b/gcc/testsuite/g++.target/i386/vect-cmp.C
+@@ -0,0 +1,23 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=x86-64-v3 -fdump-tree-optimized" } */
++
++#define vect8 __attribute__((vector_size(8) ))
++#define vect16 __attribute__((vector_size(16) ))
++#define vect32 __attribute__((vector_size(32) ))
++
++vect8 int bar0 (vect8 float a, vect8 float b, vect8 int c)
++{
++  return (a > b) ? 0 : c;
++}
++
++vect16 int bar1 (vect16 float a, vect16 float b, vect16 int c)
++{
++  return (a > b) ? 0 : c;
++}
++
++vect32 int bar2 (vect32 float a, vect32 float b, vect32 int c)
++{
++  return (a > b) ? 0 : c;
++}
++
++/* { dg-final { scan-tree-dump-times ".BIT_ANDN " 3 "optimized" { target { ! ia32 } } } } */
+-- 
+2.43.5
