@@ -1,3 +1,8 @@
+17	20 October 2024
+
+	+ 73_all_PR117190-Revert-c-Fix-up-speed-up-compilation-of-large-char-a.patch
+	+ 74_all_PR117190-Revert-c-Speed-up-compilation-of-large-char-array-in.patch
+
 16	13 October 2024
 
 	+ 70_all_PR116506-coro.patch
