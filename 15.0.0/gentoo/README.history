@@ -1,3 +1,8 @@
+20	????
+
+	- 73_all_PR117190-Revert-c-Fix-up-speed-up-compilation-of-large-char-a.patch
+	- 74_all_PR117190-Revert-c-Speed-up-compilation-of-large-char-array-in.patch
+
 19	21 October 2024
 
 	U 75_all_PR117220-uninitialized-clang.patch
