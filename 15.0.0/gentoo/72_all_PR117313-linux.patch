@@ -1,0 +1,104 @@
+2024-10-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/117313
+gcc/c-family/
+	* c-common.cc (complete_array_type): For RAW_DATA_CST elements
+	advance curindex by RAW_DATA_LENGTH or one less than that if
+	ce->index is non-NULL.  Handle even the first element if
+	it is RAW_DATA_CST.  Formatting fix.
+gcc/testsuite/
+	* c-c++-common/init-6.c: New test.
+
+--- a/gcc/c-family/c-common.cc	2024-10-27 16:39:55.090871381 +0100
++++ b/gcc/c-family/c-common.cc	2024-10-28 12:30:01.215814079 +0100
+@@ -7044,7 +7044,8 @@ complete_array_type (tree *ptype, tree i
+ 	{
+ 	  int eltsize
+ 	    = int_size_in_bytes (TREE_TYPE (TREE_TYPE (initial_value)));
+-	  maxindex = size_int (TREE_STRING_LENGTH (initial_value)/eltsize - 1);
++	  maxindex = size_int (TREE_STRING_LENGTH (initial_value) / eltsize
++			       - 1);
+ 	}
+       else if (TREE_CODE (initial_value) == CONSTRUCTOR)
+ 	{
+@@ -7059,23 +7060,25 @@ complete_array_type (tree *ptype, tree i
+ 	  else
+ 	    {
+ 	      tree curindex;
+-	      unsigned HOST_WIDE_INT cnt;
++	      unsigned HOST_WIDE_INT cnt = 1;
+ 	      constructor_elt *ce;
+ 	      bool fold_p = false;
+ 
+ 	      if ((*v)[0].index)
+ 		maxindex = (*v)[0].index, fold_p = true;
++	      if (TREE_CODE ((*v)[0].value) == RAW_DATA_CST)
++		cnt = 0;
+ 
+ 	      curindex = maxindex;
+ 
+-	      for (cnt = 1; vec_safe_iterate (v, cnt, &ce); cnt++)
++	      for (; vec_safe_iterate (v, cnt, &ce); cnt++)
+ 		{
+ 		  bool curfold_p = false;
+ 		  if (ce->index)
+ 		    curindex = ce->index, curfold_p = true;
+-		  else
++		  if (!ce->index || TREE_CODE (ce->value) == RAW_DATA_CST)
+ 		    {
+-		      if (fold_p)
++		      if (fold_p || curfold_p)
+ 			{
+ 			  /* Since we treat size types now as ordinary
+ 			     unsigned types, we need an explicit overflow
+@@ -7083,9 +7086,16 @@ complete_array_type (tree *ptype, tree i
+ 			  tree orig = curindex;
+ 		          curindex = fold_convert (sizetype, curindex);
+ 			  overflow_p |= tree_int_cst_lt (curindex, orig);
++			  curfold_p = false;
+ 			}
+-		      curindex = size_binop (PLUS_EXPR, curindex,
+-					     size_one_node);
++		      if (TREE_CODE (ce->value) == RAW_DATA_CST)
++			curindex
++			  = size_binop (PLUS_EXPR, curindex,
++					size_int (RAW_DATA_LENGTH (ce->value)
++						  - (ce->index ? 1 : 0)));
++		      else
++			curindex = size_binop (PLUS_EXPR, curindex,
++					       size_one_node);
+ 		    }
+ 		  if (tree_int_cst_lt (maxindex, curindex))
+ 		    maxindex = curindex, fold_p = curfold_p;
+--- a/gcc/testsuite/c-c++-common/init-6.c	2024-10-28 12:35:59.526803017 +0100
++++ b/gcc/testsuite/c-c++-common/init-6.c	2024-10-28 12:35:50.394930729 +0100
+@@ -0,0 +1,29 @@
++/* PR c/117313 */
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++
++struct S { unsigned a; const unsigned char b[]; };
++struct S s = {
++  1,
++  { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0x81, 0xa5,
++    0x81, 0xbd, 0x99, 0x81, 0x7e, 0x7e, 0xff, 0xdb, 0xff, 0xc3, 0xe7,
++    0xff, 0x7e, 0x6c, 0xfe, 0xfe, 0xfe, 0x7c, 0x38, 0x10, 0x00, 0x10,
++    0x38, 0x00, 0x00, 0x38, 0x6c, 0x6c, 0x38, 0x00, 0x00, 0x00, 0x00,
++    0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++    0x18, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x0c, 0x0c, 0xec, 0x6c, 0x3c,
++  }
++};
++struct S t = {
++  2,
++  { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0x81, 0xa5,
++    0x81, 0xbd, 0x99, 0x81, 0x7e, 0x7e, 0xff, 0xdb, 0xff, 0xc3, 0xe7,
++    0xff, 0x7e, 0x6c, 0xfe, 0xfe, 0xfe, 0x7c, 0x38, 0x10, 0x00, 0x10,
++    0x38, 0x00, 0x00, 0x38, 0x6c, 0x6c, 0x38, 0x00, 0x00, 0x00, 0x00,
++    0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++    0x18, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x0c, 0x0c, 0xec, 0x6c, 0x3c,
++    0xff, 0x7e, 0x6c, 0xfe, 0xfe, 0xfe, 0x7c, 0x38, 0x10, 0x00, 0x10,
++    0x38, 0x00, 0x00, 0x38, 0x6c, 0x6c, 0x38, 0x00, 0x00, 0x00, 0x00,
++    0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++    0x18, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x0c, 0x0c, 0xec, 0x6c, 0x3c
++  }
++};
