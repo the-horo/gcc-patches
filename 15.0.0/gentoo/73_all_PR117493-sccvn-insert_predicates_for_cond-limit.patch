@@ -1,0 +1,41 @@
+https://gcc.gnu.org/PR117493
+https://gcc.gnu.org/PR117496
+
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=117493#c5
+--- a/gcc/tree-ssa-sccvn.cc
++++ b/gcc/tree-ssa-sccvn.cc
+@@ -7902,8 +7902,11 @@ insert_related_predicates_on_edge (enum tree_code code, tree *ops, edge pred_e)
+    derived from LHS CODE RHS.  */
+ static void
+ insert_predicates_for_cond (tree_code code, tree lhs, tree rhs,
+-			    edge true_e, edge false_e)
++			    edge true_e, edge false_e, int n = 0)
+ {
++  if (n > 5)
++    return;
++
+   /* If both edges are null, then there is nothing to be done. */
+   if (!true_e && !false_e)
+     return;
+@@ -7964,7 +7967,7 @@ insert_predicates_for_cond (tree_code code, tree lhs, tree rhs,
+ 	    edge nf = false_e;
+ 	    if (code == EQ_EXPR)
+ 	      std::swap (nt, nf);
+-	    insert_predicates_for_cond (nc, nlhs, nrhs, nt, nf);
++	    insert_predicates_for_cond (nc, nlhs, nrhs, nt, nf, n + 1);
+ 	  }
+       /* (a | b) == 0 ->
+ 	    on true edge assert: a == 0 & b == 0. */
+@@ -7977,10 +7980,10 @@ insert_predicates_for_cond (tree_code code, tree lhs, tree rhs,
+ 	  tree nlhs;
+ 
+ 	  nlhs = vn_valueize (gimple_assign_rhs1 (def_stmt));
+-	  insert_predicates_for_cond (EQ_EXPR, nlhs, rhs, e, nullptr);
++	  insert_predicates_for_cond (EQ_EXPR, nlhs, rhs, e, nullptr, n + 1);
+ 
+ 	  nlhs = vn_valueize (gimple_assign_rhs2 (def_stmt));
+-	  insert_predicates_for_cond (EQ_EXPR, nlhs, rhs, e, nullptr);
++	  insert_predicates_for_cond (EQ_EXPR, nlhs, rhs, e, nullptr, n + 1);
+ 	}
+     }
+ }
