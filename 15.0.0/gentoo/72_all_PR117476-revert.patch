@@ -1,0 +1,74 @@
+From df77b7d66ca5dee0130765f37d8afba29f0f1f28 Mon Sep 17 00:00:00 2001
+Message-ID: <df77b7d66ca5dee0130765f37d8afba29f0f1f28.1731471945.git.sam@gentoo.org>
+From: Sam James <sam@gentoo.org>
+Date: Wed, 13 Nov 2024 04:25:31 +0000
+Subject: [PATCH] Revert "Reapply "[PATCH v2] RISC-V: zero_extend(not) -> xor
+ optimization [PR112398]""
+
+This reverts commit 10d76b7f1e5b63ad6d2b92940c39007913ced037.
+
+Bug: https://gcc.gnu.org/PR117476
+---
+ gcc/simplify-rtx.cc                       | 22 ----------------------
+ gcc/testsuite/gcc.target/riscv/pr112398.c | 14 --------------
+ 2 files changed, 36 deletions(-)
+ delete mode 100644 gcc/testsuite/gcc.target/riscv/pr112398.c
+
+diff --git a/gcc/simplify-rtx.cc b/gcc/simplify-rtx.cc
+index d05efac20dc8..893c5f6e1ae0 100644
+--- a/gcc/simplify-rtx.cc
++++ b/gcc/simplify-rtx.cc
+@@ -1842,28 +1842,6 @@ simplify_context::simplify_unary_operation_1 (rtx_code code, machine_mode mode,
+ 	      & ~GET_MODE_MASK (op_mode)) == 0)
+ 	return SUBREG_REG (op);
+ 
+-      /* Trying to optimize:
+-	 (zero_extend:M (subreg:N (not:M (X:M)))) ->
+-	 (xor:M (zero_extend:M (subreg:N (X:M)), mask))
+-	 where the mask is GET_MODE_MASK (N).
+-	 For the cases when X:M doesn't have any non-zero bits
+-	 outside of mode N, (zero_extend:M (subreg:N (X:M))
+-	 will be simplified to just (X:M)
+-	 and whole optimization will be -> (xor:M (X:M, mask)).  */
+-      if (SUBREG_P (op)
+-	  && GET_CODE (XEXP (op, 0)) == NOT
+-	  && GET_MODE (XEXP (op, 0)) == mode
+-	  && subreg_lowpart_p (op)
+-	  && GET_MODE_SIZE (GET_MODE (op)).is_constant ()
+-	  && (nonzero_bits (XEXP (XEXP (op, 0), 0), mode)
+-	      & ~GET_MODE_MASK (mode)) == 0)
+-      {
+-	const uint64_t mask = GET_MODE_MASK (GET_MODE (op));
+-	return simplify_gen_binary (XOR, mode,
+-				    XEXP (XEXP (op, 0), 0),
+-				    gen_int_mode (mask, mode));
+-      }
+-
+ #if defined(POINTERS_EXTEND_UNSIGNED)
+       /* As we do not know which address space the pointer is referring to,
+ 	 we can do this only if the target does not support different pointer
+diff --git a/gcc/testsuite/gcc.target/riscv/pr112398.c b/gcc/testsuite/gcc.target/riscv/pr112398.c
+deleted file mode 100644
+index 624a665b76c9..000000000000
+--- a/gcc/testsuite/gcc.target/riscv/pr112398.c
++++ /dev/null
+@@ -1,14 +0,0 @@
+-/* { dg-do compile } */
+-/* { dg-options "-march=rv64gc -mabi=lp64d" } */
+-/* { dg-skip-if "" { *-*-* } { "-O0" "-Og" } } */
+-
+-#include <stdint.h>
+-
+-uint8_t neg_u8 (const uint8_t src)
+-{
+-  return ~src;
+-}
+-
+-/* { dg-final { scan-assembler-times "xori\t" 1 } } */
+-/* { dg-final { scan-assembler-not "not\t" } } */
+-/* { dg-final { scan-assembler-not "andi\t" } } */
+
+base-commit: 445d8bb6a89eb2275c4930ec87a98d5123e5abdd
+-- 
+2.47.0
+
