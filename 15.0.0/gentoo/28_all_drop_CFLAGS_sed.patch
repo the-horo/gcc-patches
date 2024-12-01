@@ -3,7 +3,7 @@ https://github.com/InBetweenNames/gentooLTO/issues/846
 https://github.com/vaeth/portage-bashrc-mv/issues/11
 --- a/gcc/configure
 +++ b/gcc/configure
-@@ -5388,13 +5388,6 @@ ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ex
+@@ -5473,13 +5473,6 @@ ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ex
  ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
  
  
@@ -11,15 +11,15 @@ https://github.com/vaeth/portage-bashrc-mv/issues/11
 -# optimizations to be activated explicitly by the toplevel.
 -case "$CC" in
 -  */prev-gcc/xgcc*) ;;
--  *) CFLAGS=`echo "$CFLAGS " | sed -e "s/-Ofast[ 	]//" -e "s/-O[gs][ 	]//" -e "s/-O[0-9]*[ 	]//" `
--     CXXFLAGS=`echo "$CXXFLAGS " | sed -e "s/-Ofast[ 	]//" -e "s/-O[gs][ 	]//" -e "s/-O[0-9]*[ 	]//" ` ;;
+-  *) CFLAGS=`echo "$CFLAGS " | sed -e "s/-Ofast[ 	]//" -e "s/-O[gs][ 	]//" -e "s/[^,]-O[0-9]*[ 	]//" `
+-     CXXFLAGS=`echo "$CXXFLAGS " | sed -e "s/-Ofast[ 	]//" -e "s/-O[gs][ 	]//" -e "s/[^,]-O[0-9]*[ 	]//" ` ;;
 -esac
  
  
  
 --- a/gcc/configure.ac
 +++ b/gcc/configure.ac
-@@ -440,13 +440,6 @@ ACX_PROG_GDC([-I"$srcdir"/d])
+@@ -463,13 +463,6 @@ ACX_PROG_GDC([-I"$srcdir"/d])
  # Do configure tests with the C++ compiler, since that's what we build with.
  AC_LANG(C++)
  
@@ -27,8 +27,8 @@ https://github.com/vaeth/portage-bashrc-mv/issues/11
 -# optimizations to be activated explicitly by the toplevel.
 -case "$CC" in
 -  */prev-gcc/xgcc*) ;;
--  *) CFLAGS=`echo "$CFLAGS " | sed -e "s/-Ofast[[ 	]]//" -e "s/-O[[gs]][[ 	]]//" -e "s/-O[[0-9]]*[[ 	]]//" `
--     CXXFLAGS=`echo "$CXXFLAGS " | sed -e "s/-Ofast[[ 	]]//" -e "s/-O[[gs]][[ 	]]//" -e "s/-O[[0-9]]*[[ 	]]//" ` ;;
+-  *) CFLAGS=`echo "$CFLAGS " | sed -e "s/-Ofast[[ 	]]//" -e "s/-O[[gs]][[ 	]]//" -e "s/[[^,]]-O[[0-9]]*[[ 	]]//" `
+-     CXXFLAGS=`echo "$CXXFLAGS " | sed -e "s/-Ofast[[ 	]]//" -e "s/-O[[gs]][[ 	]]//" -e "s/[[^,]]-O[[0-9]]*[[ 	]]//" ` ;;
 -esac
  AC_SUBST(CFLAGS)
  AC_SUBST(CXXFLAGS)

@@ -3,6 +3,7 @@
 	- 72_all_PR111600-genemit-Distribute-evenly-to-files.patch
 	U 04_all_nossp-on-nostdlib.patch
 	U 26_all_enable-cet.patch
+	U 28_all_drop_CFLAGS_sed.patch
 
 28	25 November 2024
 
