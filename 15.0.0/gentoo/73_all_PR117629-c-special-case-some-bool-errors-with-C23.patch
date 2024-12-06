@@ -1,0 +1,312 @@
+https://inbox.sourceware.org/gcc-patches/20241126034902.1294094-1-dmalcolm@redhat.com/
+
+From 3d35e4348a0771cedc5a540f70eaa90f3ea68f23 Mon Sep 17 00:00:00 2001
+Message-ID: <3d35e4348a0771cedc5a540f70eaa90f3ea68f23.1733506366.git.sam@gentoo.org>
+From: David Malcolm <dmalcolm@redhat.com>
+Date: Mon, 25 Nov 2024 22:49:02 -0500
+Subject: [PATCH] c: special-case some "bool" errors with C23 [PR117629]
+
+This patch attempts to provide better error messages for
+code compiled with C23 that hasn't been updated for
+"bool", "true", and "false" becoming keywords (based on
+a brief review of the Gentoo bug tracker links given at
+https://gcc.gnu.org/pipermail/gcc/2024-November/245185.html).
+
+Specifically:
+
+(1) with "typedef int bool;" previously we emitted:
+
+t1.c:7:13: error: two or more data types in declaration specifiers
+    7 | typedef int bool;
+      |             ^~~~
+t1.c:7:1: warning: useless type name in empty declaration
+    7 | typedef int bool;
+      | ^~~~~~~
+
+whereas with this patch we emit:
+
+t1.c:7:13: error: 'bool' cannot be defined via 'typedef'
+    7 | typedef int bool;
+      |             ^~~~
+t1.c:7:13: note: 'bool' is a keyword with '-std=c23' onwards
+t1.c:7:1: warning: useless type name in empty declaration
+    7 | typedef int bool;
+      | ^~~~~~~
+
+(2) with "int bool;" previously we emitted:
+
+t2.c:7:5: error: two or more data types in declaration specifiers
+    7 | int bool;
+      |     ^~~~
+t2.c:7:1: warning: useless type name in empty declaration
+    7 | int bool;
+      | ^~~
+
+whereas with this patch we emit:
+
+t2.c:7:5: error: 'bool' cannot be used here
+    7 | int bool;
+      |     ^~~~
+t2.c:7:5: note: 'bool' is a keyword with '-std=c23' onwards
+t2.c:7:1: warning: useless type name in empty declaration
+    7 | int bool;
+      | ^~~
+
+(3) with "typedef enum { false = 0, true = 1 } _Bool;" previously we
+emitted:
+
+t3.c:7:16: error: expected identifier before 'false'
+    7 | typedef enum { false = 0, true = 1 } _Bool;
+      |                ^~~~~
+t3.c:7:38: error: expected ';', identifier or '(' before '_Bool'
+    7 | typedef enum { false = 0, true = 1 } _Bool;
+      |                                      ^~~~~
+t3.c:7:38: warning: useless type name in empty declaration
+
+whereas with this patch we emit:
+
+t3.c:7:16: error: cannot use keyword 'false' as enumeration constant
+    7 | typedef enum { false = 0, true = 1 } _Bool;
+      |                ^~~~~
+t3.c:7:16: note: 'false' is a keyword with '-std=c23' onwards
+t3.c:7:38: error: expected ';', identifier or '(' before '_Bool'
+    7 | typedef enum { false = 0, true = 1 } _Bool;
+      |                                      ^~~~~
+t3.c:7:38: warning: useless type name in empty declaration
+
+Successfully bootstrapped & regrtested on x86_64-pc-linux-gnu.
+OK for trunk?
+
+gcc/c/ChangeLog:
+	PR c/117629
+	* c-decl.cc (declspecs_add_type): Special-case attempts to use
+	bool as a typedef name or declaration name.
+	* c-errors.cc (add_note_about_new_keyword): New.
+	* c-parser.cc (report_bad_enum_name): New, split out from...
+	(c_parser_enum_specifier): ...here, adding handling for RID_FALSE
+	and RID_TRUE.
+	* c-tree.h (add_note_about_new_keyword): New decl.
+
+gcc/testsuite/ChangeLog:
+	PR c/117629
+	* gcc.dg/auto-type-2.c: Update expected output with _Bool.
+	* gcc.dg/c23-bool-errors-1.c: New test.
+	* gcc.dg/c23-bool-errors-2.c: New test.
+	* gcc.dg/c23-bool-errors-3.c: New test.
+
+Signed-off-by: David Malcolm <dmalcolm@redhat.com>
+---
+ gcc/c/c-decl.cc                          | 18 +++++++-
+ gcc/c/c-errors.cc                        | 13 ++++++
+ gcc/c/c-parser.cc                        | 53 +++++++++++++++++++-----
+ gcc/c/c-tree.h                           |  3 ++
+ gcc/testsuite/gcc.dg/auto-type-2.c       |  2 +-
+ gcc/testsuite/gcc.dg/c23-bool-errors-1.c |  9 ++++
+ gcc/testsuite/gcc.dg/c23-bool-errors-2.c |  9 ++++
+ gcc/testsuite/gcc.dg/c23-bool-errors-3.c | 15 +++++++
+ 8 files changed, 109 insertions(+), 13 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/c23-bool-errors-1.c
+ create mode 100644 gcc/testsuite/gcc.dg/c23-bool-errors-2.c
+ create mode 100644 gcc/testsuite/gcc.dg/c23-bool-errors-3.c
+
+diff --git a/gcc/c/c-decl.cc b/gcc/c/c-decl.cc
+index 7abf1921b577..91d5fee50402 100644
+--- a/gcc/c/c-decl.cc
++++ b/gcc/c/c-decl.cc
+@@ -12493,8 +12493,22 @@ declspecs_add_type (location_t loc, struct c_declspecs *specs,
+ 	     "__auto_type".  */
+ 	  if (specs->typespec_word != cts_none)
+ 	    {
+-	      error_at (loc,
+-			"two or more data types in declaration specifiers");
++	      if (i == RID_BOOL)
++		{
++		  auto_diagnostic_group d;
++		  if (specs->storage_class == csc_typedef)
++		    error_at (loc,
++			      "%qs cannot be defined via %<typedef%>",
++			      IDENTIFIER_POINTER (type));
++		  else
++		    error_at (loc,
++			      "%qs cannot be used here",
++			      IDENTIFIER_POINTER (type));
++		  add_note_about_new_keyword (loc, type, "-std=c23");
++		}
++	      else
++		error_at (loc,
++			  "two or more data types in declaration specifiers");
+ 	      return specs;
+ 	    }
+ 	  switch (i)
+diff --git a/gcc/c/c-errors.cc b/gcc/c/c-errors.cc
+index 77f008eba1c2..cc9bb128ee8b 100644
+--- a/gcc/c/c-errors.cc
++++ b/gcc/c/c-errors.cc
+@@ -215,3 +215,16 @@ out:
+   va_end (ap);
+   return warned;
+ }
++
++/* Issue a note to the user at LOC that KEYWORD_ID is a keyword
++   in STD_OPTION version of the standard onwards.  */
++
++void
++add_note_about_new_keyword (location_t loc,
++			    tree keyword_id,
++			    const char *std_option)
++{
++  gcc_assert (TREE_CODE (keyword_id) == IDENTIFIER_NODE);
++  inform (loc, "%qs is a keyword with %qs onwards",
++	  IDENTIFIER_POINTER (keyword_id), std_option);
++}
+diff --git a/gcc/c/c-parser.cc b/gcc/c/c-parser.cc
+index 4ec0ee85ac49..18ba82e83f02 100644
+--- a/gcc/c/c-parser.cc
++++ b/gcc/c/c-parser.cc
+@@ -3785,6 +3785,48 @@ c_parser_declspecs (c_parser *parser, struct c_declspecs *specs,
+     specs->postfix_attrs = c_parser_std_attribute_specifier_sequence (parser);
+ }
+ 
++/* Complain about a non-CPP_NAME within an enumerator list.  */
++
++static void
++report_bad_enum_name (c_parser *parser)
++{
++  if (!parser->error)
++    {
++      c_token *token = c_parser_peek_token (parser);
++      switch (token->type)
++	{
++	default:
++	  break;
++	case CPP_CLOSE_BRACE:
++	  /* Give a nicer error for "enum {}".  */
++	  error_at (token->location,
++		    "empty enum is invalid");
++	  parser->error = true;
++	  return;
++	case CPP_KEYWORD:
++	  /* Give a nicer error for attempts to use "true" and "false"
++	     in enums with C23 onwards.  */
++	  if (token->keyword == RID_FALSE
++	      || token->keyword == RID_TRUE)
++	    {
++	      auto_diagnostic_group d;
++	      error_at (token->location,
++			"cannot use keyword %qs as enumeration constant",
++			IDENTIFIER_POINTER (token->value));
++	      add_note_about_new_keyword (token->location,
++					  token->value,
++					  "-std=c23");
++	      parser->error = true;
++	      return;
++	    }
++	  break;
++	}
++    }
++
++  /* Otherwise, a more generic error message.  */
++  c_parser_error (parser, "expected identifier");
++}
++
+ /* Parse an enum specifier (C90 6.5.2.2, C99 6.7.2.2, C11 6.7.2.2).
+ 
+    enum-specifier:
+@@ -3952,16 +3994,7 @@ c_parser_enum_specifier (c_parser *parser)
+ 	  location_t decl_loc, value_loc;
+ 	  if (c_parser_next_token_is_not (parser, CPP_NAME))
+ 	    {
+-	      /* Give a nicer error for "enum {}".  */
+-	      if (c_parser_next_token_is (parser, CPP_CLOSE_BRACE)
+-		  && !parser->error)
+-		{
+-		  error_at (c_parser_peek_token (parser)->location,
+-			    "empty enum is invalid");
+-		  parser->error = true;
+-		}
+-	      else
+-		c_parser_error (parser, "expected identifier");
++	      report_bad_enum_name (parser);
+ 	      c_parser_skip_until_found (parser, CPP_CLOSE_BRACE, NULL);
+ 	      values = error_mark_node;
+ 	      break;
+diff --git a/gcc/c/c-tree.h b/gcc/c/c-tree.h
+index d39bd238103e..e98bd4f2fd8d 100644
+--- a/gcc/c/c-tree.h
++++ b/gcc/c/c-tree.h
+@@ -955,6 +955,9 @@ extern bool pedwarn_c11 (location_t, diagnostic_option_id, const char *, ...)
+     ATTRIBUTE_GCC_DIAG(3,4);
+ extern bool pedwarn_c23 (location_t, diagnostic_option_id, const char *, ...)
+     ATTRIBUTE_GCC_DIAG(3,4);
++extern void add_note_about_new_keyword (location_t loc,
++					tree keyword_id,
++					const char *std_option);
+ 
+ extern void
+ set_c_expr_source_range (c_expr *expr,
+diff --git a/gcc/testsuite/gcc.dg/auto-type-2.c b/gcc/testsuite/gcc.dg/auto-type-2.c
+index 761671b3c5a4..f484acb4c916 100644
+--- a/gcc/testsuite/gcc.dg/auto-type-2.c
++++ b/gcc/testsuite/gcc.dg/auto-type-2.c
+@@ -20,4 +20,4 @@ signed __auto_type e7 = 0; /* { dg-error "__auto_type" } */
+ unsigned __auto_type e8 = 0; /* { dg-error "__auto_type" } */
+ _Complex __auto_type e9 = 0; /* { dg-error "__auto_type" } */
+ int __auto_type e10 = 0; /* { dg-error "two or more data types" } */
+-__auto_type _Bool e11 = 0; /* { dg-error "two or more data types" } */
++__auto_type _Bool e11 = 0; /* { dg-error "'_Bool' cannot be used here" } */
+diff --git a/gcc/testsuite/gcc.dg/c23-bool-errors-1.c b/gcc/testsuite/gcc.dg/c23-bool-errors-1.c
+new file mode 100644
+index 000000000000..8a33d36a8891
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/c23-bool-errors-1.c
+@@ -0,0 +1,9 @@
++/* Test error-handling for legacy code that tries to
++   define "bool" with C23.  */
++
++/* { dg-do compile } */
++/* { dg-options "-std=c23" } */
++
++typedef int bool; /* { dg-error "'bool' cannot be defined via 'typedef'" } */
++/* { dg-message "'bool' is a keyword with '-std=c23' onwards" "" { target *-*-* } .-1 } */
++/* { dg-warning "useless type name in empty declaration"  "" { target *-*-* } .-2 } */
+diff --git a/gcc/testsuite/gcc.dg/c23-bool-errors-2.c b/gcc/testsuite/gcc.dg/c23-bool-errors-2.c
+new file mode 100644
+index 000000000000..1a66e3aea67e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/c23-bool-errors-2.c
+@@ -0,0 +1,9 @@
++/* Test error-handling for legacy code that tries to
++   use a variable named "bool" with C23.  */
++
++/* { dg-do compile } */
++/* { dg-options "-std=c23" } */
++
++int bool; /* { dg-error "'bool' cannot be used here" } */
++/* { dg-message "'bool' is a keyword with '-std=c23' onwards" "" { target *-*-* } .-1 } */
++/* { dg-warning "useless type name in empty declaration" "" { target *-*-* } .-2 } */
+diff --git a/gcc/testsuite/gcc.dg/c23-bool-errors-3.c b/gcc/testsuite/gcc.dg/c23-bool-errors-3.c
+new file mode 100644
+index 000000000000..634c8ac45a52
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/c23-bool-errors-3.c
+@@ -0,0 +1,15 @@
++/* Test error-handling for legacy code that tries to
++   define "false" or "true" within enums with C23.  */
++
++/* { dg-do compile } */
++/* { dg-options "-std=c23" } */
++
++typedef enum { false = 0, true = 1 } _Bool; /* { dg-error "cannot use keyword 'false' as enumeration constant" }
++/* { dg-message "'false' is a keyword with '-std=c23' onwards" "" { target *-*-* } .-1 } */
++/* { dg-error "38: expected ';', identifier or '\\\(' before '_Bool'" "" { target *-*-* } .-2 } */
++/* { dg-warning "38: useless type name in empty declaration" "" { target *-*-* } .-3 } */
++
++typedef enum { true = 1, false = 0 } _Bool; /* { dg-error "cannot use keyword 'true' as enumeration constant" }
++/* { dg-message "'true' is a keyword with '-std=c23' onwards" "" { target *-*-* } .-1 } */
++/* { dg-error "38: expected ';', identifier or '\\\(' before '_Bool'" "" { target *-*-* } .-2 } */
++/* { dg-warning "38: useless type name in empty declaration" "" { target *-*-* } .-3 } */
+
+base-commit: 115e4bf54ec91a4f358a9e68dcd7a234b0ccc5b8
+-- 
+2.47.1
+
