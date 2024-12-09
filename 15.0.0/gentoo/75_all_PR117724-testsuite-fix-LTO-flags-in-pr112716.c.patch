@@ -1,0 +1,27 @@
+From 2f961c392ab359286ef1350d37e50e7841773d7b Mon Sep 17 00:00:00 2001
+Message-ID: <2f961c392ab359286ef1350d37e50e7841773d7b.1733713329.git.sam@gentoo.org>
+In-Reply-To: <e1d3dfa0936ca5b50c87f6ddf5347fa401a703f6.1733713329.git.sam@gentoo.org>
+References: <e1d3dfa0936ca5b50c87f6ddf5347fa401a703f6.1733713329.git.sam@gentoo.org>
+From: Sam James <sam@gentoo.org>
+Date: Mon, 9 Dec 2024 03:01:47 +0000
+Subject: [PATCH 2/2] testsuite: fix LTO flags in pr112716.c
+
+---
+ gcc/testsuite/gcc.dg/pr112716.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/testsuite/gcc.dg/pr112716.c b/gcc/testsuite/gcc.dg/pr112716.c
+index 109dd252f0d6..873eedaafd18 100644
+--- a/gcc/testsuite/gcc.dg/pr112716.c
++++ b/gcc/testsuite/gcc.dg/pr112716.c
+@@ -1,5 +1,6 @@
+ /* { dg-do compile } */
+-/* { dg-options "-lfto -O2" } */
++/* { dg-options "-flto -O2" } */
++/* { dg-require-effective-target lto } */
+ 
+ #define T1 int[n]
+ #define T2 int[n]
+-- 
+2.47.1
+

@@ -1,3 +1,8 @@
+31	???
+
+	+ 74_all_PR117724-Fix-type-compatibility-for-types-with-flexible-array.patch
+	+ 75_all_PR117724-testsuite-fix-LTO-flags-in-pr112716.c.patch
+
 30	8 December 2024
 
 	+ 73_all_PR117629-c-special-case-some-bool-errors-with-C23.patch
