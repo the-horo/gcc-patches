@@ -1,75 +1,35 @@
-From e1d3dfa0936ca5b50c87f6ddf5347fa401a703f6 Mon Sep 17 00:00:00 2001
-Message-ID: <e1d3dfa0936ca5b50c87f6ddf5347fa401a703f6.1733713329.git.sam@gentoo.org>
+From 511aac7c85e6cc2ce474e1169dadd17c570743ec Mon Sep 17 00:00:00 2001
+Message-ID: <511aac7c85e6cc2ce474e1169dadd17c570743ec.1733842378.git.sam@gentoo.org>
 From: Martin Uecker <uecker@tugraz.at>
-Date: Mon, 9 Dec 2024 00:11:58 +0100
+Date: Tue, 10 Dec 2024 13:29:27 +0100
 Subject: [PATCH 1/2] Fix type compatibility for types with flexible array
- member [PR113688,PR114014,PR117724]
+ member [PR113688,PR114713,PR117724]
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-Hi Richard,
-
-this is another version.  It now adds an "ignore_size" flag
-to gimple_canonical_types_compatible_p and uses this instead
-of having the complicated special case for arrays at the
-end.  Also zero-sized members are now ignored again, except
-if they are arrays at the end where then only the size is
-ignored.  This can still be stricter than before for the 
-case where there are zero-sized arrays at the end (e.g.
-before element type could differ).
-
-Martin
+As requested, I split up into one part for the TYPE_MODE and 
+another one for the array size to help with git bisecting.  This
+is the first part.
 
 Bootstrapped and regression tested on x86_64.
 
-Fix type compatibility for types with flexible array member [PR113688,PR114014,PR117724]
+Allow the TYPE_MODE of a type with an array as last member to differ from
+another compatible type.
 
-    verify_type checks the compatibility of TYPE_CANONICAL using
-    gimple_canonical_types_compatible_p.   But it is stricter than what the
-    C standard requires and therefor inconsistent with how TYPE_CANONICAL is set
-    in the C FE.  Here, the logic is changed to ignore the array size when it
-    is the last element of a structure or union.  To not get errors because of
-    an inconsistent number of members, zero-sized arrays which are the last
-    element are not ignored anymore when checking the fields of a struct (which
-    in this particular case is stricter than what was done before).  Finally,
-    exceptions are added that allow the TYPE_MODE of a type with an array as
-    last member and of such arrays to differ from another compatible type.
+gcc/ChangeLog:
+        * tree.cc (gimple_canonical_types_compatible_p): Add exception.
+        (verify_type): Add exception.
 
-            PR c/112716
-            PR c/113688
-            PR c/114014
-            PR c/117724
-
-    gcc/ChangeLog:
-            * tree.cc (gimple_canonical_types_compatible_p): Add
-              `ignore_size' parameter and revise logic.
-            (verify_type): Add exceptions.
-
-    gcc/lto/ChangeLog:
-            * lto-common.cc (hash_canonical_type): Add exceptions.
-
-    gcc/testsuite/ChangeLog:
-            * gcc.dg/pr112716.c: New test.
-            * gcc.dg/pr113688.c: New test.
-            * gcc.dg/pr114014.c: New test.
-            * gcc.dg/pr117724.c: New test.
+gcc/lto/ChangeLog:
+        * lto-common.cc (hash_canonical_type): Add exception.
 ---
- gcc/lto/lto-common.cc           |  9 ++++--
- gcc/testsuite/gcc.dg/pr112716.c | 40 +++++++++++++++++++++++++
- gcc/testsuite/gcc.dg/pr113688.c |  8 +++++
- gcc/testsuite/gcc.dg/pr114014.c | 14 +++++++++
- gcc/testsuite/gcc.dg/pr117724.c | 16 ++++++++++
- gcc/tree.cc                     | 53 +++++++++++++++++++++++++--------
- gcc/tree.h                      |  3 +-
- 7 files changed, 127 insertions(+), 16 deletions(-)
- create mode 100644 gcc/testsuite/gcc.dg/pr112716.c
- create mode 100644 gcc/testsuite/gcc.dg/pr113688.c
- create mode 100644 gcc/testsuite/gcc.dg/pr114014.c
- create mode 100644 gcc/testsuite/gcc.dg/pr117724.c
+ gcc/lto/lto-common.cc |  3 ++-
+ gcc/tree.cc           | 12 +++++++++---
+ 2 files changed, 11 insertions(+), 4 deletions(-)
 
 diff --git a/gcc/lto/lto-common.cc b/gcc/lto/lto-common.cc
-index 86a309f92b40..f65a9d1c7b6f 100644
+index 86a309f92b40..940502099128 100644
 --- a/gcc/lto/lto-common.cc
 +++ b/gcc/lto/lto-common.cc
 @@ -254,7 +254,8 @@ hash_canonical_type (tree type)
@@ -82,143 +42,11 @@ index 86a309f92b40..f65a9d1c7b6f 100644
  
    /* Incorporate common features of numerical types.  */
    if (INTEGRAL_TYPE_P (type)
-@@ -332,7 +333,11 @@ hash_canonical_type (tree type)
- 	    && (! DECL_SIZE (f)
- 		|| ! integer_zerop (DECL_SIZE (f))))
- 	  {
--	    iterative_hash_canonical_type (TREE_TYPE (f), hstate);
-+	    tree t = TREE_TYPE (f);
-+	    if (!TREE_CHAIN (f)
-+		&& TREE_CODE (t) == ARRAY_TYPE)
-+	      t = TREE_TYPE  (t);
-+	    iterative_hash_canonical_type (t, hstate);
- 	    nf++;
- 	  }
- 
-diff --git a/gcc/testsuite/gcc.dg/pr112716.c b/gcc/testsuite/gcc.dg/pr112716.c
-new file mode 100644
-index 000000000000..109dd252f0d6
---- /dev/null
-+++ b/gcc/testsuite/gcc.dg/pr112716.c
-@@ -0,0 +1,40 @@
-+/* { dg-do compile } */
-+/* { dg-options "-lfto -O2" } */
-+
-+#define T1 int[n]
-+#define T2 int[n]
-+
-+// TU 1
-+void bar(void*);
-+
-+[[gnu::noinline,gnu::noipa]]
-+int foo(void *p, void *q)
-+{
-+	int n = 5;
-+	struct foo { int x; typeof(T1) y; } *p2 = p;
-+	p2->x = 1;
-+	bar(q);
-+	return p2->x;
-+}
-+
-+int main()
-+{
-+	int n = 5;
-+	void *p = __builtin_malloc(sizeof(struct foo { int x; typeof(T1) y; }));
-+
-+	if (!p)
-+		return 0;
-+
-+	if (2 != foo(p, p))
-+		__builtin_abort();
-+
-+	return 0;
-+}
-+// TU 2
-+void bar(void* q)
-+{
-+	int n = 5;
-+	struct foo { int x; typeof(T2) y; } *q2 = q;
-+	q2->x = 2;
-+}
-+
-diff --git a/gcc/testsuite/gcc.dg/pr113688.c b/gcc/testsuite/gcc.dg/pr113688.c
-new file mode 100644
-index 000000000000..8dee8c86f1bf
---- /dev/null
-+++ b/gcc/testsuite/gcc.dg/pr113688.c
-@@ -0,0 +1,8 @@
-+/* { dg-do compile } */
-+/* { dg-options "-g" } */
-+
-+struct S{int x,y[1];}*a;
-+int main(void){
-+	struct S{int x,y[];};
-+}
-+
-diff --git a/gcc/testsuite/gcc.dg/pr114014.c b/gcc/testsuite/gcc.dg/pr114014.c
-new file mode 100644
-index 000000000000..1531ffab1b75
---- /dev/null
-+++ b/gcc/testsuite/gcc.dg/pr114014.c
-@@ -0,0 +1,14 @@
-+/* PR c/114014
-+ * { dg-do compile }
-+ * { dg-options "-std=gnu23 -g" } */
-+
-+struct r {
-+  int a;
-+  char b[];
-+};
-+struct r {
-+  int a;
-+  char b[0];
-+};
-+
-+
-diff --git a/gcc/testsuite/gcc.dg/pr117724.c b/gcc/testsuite/gcc.dg/pr117724.c
-new file mode 100644
-index 000000000000..d631daeb644d
---- /dev/null
-+++ b/gcc/testsuite/gcc.dg/pr117724.c
-@@ -0,0 +1,16 @@
-+/* { dg-do compile } */
-+/* { dg-options "-g" } */
-+
-+struct {
-+  unsigned long len;
-+  unsigned long size;
-+  char data[];
-+};			/* { dg-warning "unnamed struct" } */
-+struct {
-+  struct {
-+    unsigned long len;
-+    unsigned long size;
-+    char data[6];
-+  };
-+};			/* { dg-warning "unnamed struct" } */
-+
 diff --git a/gcc/tree.cc b/gcc/tree.cc
-index 83a03374a325..da4b7f5daa8c 100644
+index 83a03374a325..1391af6bd4c3 100644
 --- a/gcc/tree.cc
 +++ b/gcc/tree.cc
-@@ -13837,11 +13837,13 @@ type_with_interoperable_signedness (const_tree type)
-    verifier.  If TRUST_TYPE_CANONICAL we do not look into structure of types
-    that have TYPE_CANONICAL defined and assume them equivalent.  This is useful
-    only for LTO because only in these cases TYPE_CANONICAL equivalence
--   correspond to one defined by gimple_canonical_types_compatible_p.  */
--
-+   correspond to one defined by gimple_canonical_types_compatible_p.
-+   If IGNORE_SIZE, we allow a mismatch of the mode and the number of
-+   elements for arrays.  */
- bool
- gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
--				     bool trust_type_canonical)
-+				     bool trust_type_canonical,
-+				     bool ignore_size)
- {
-   /* Type variants should be same as the main variant.  When not doing sanity
-      checking to verify this fact, go to main variants and save some work.  */
-@@ -13914,8 +13916,12 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
+@@ -13914,8 +13914,11 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
        || TREE_CODE (t1) == NULLPTR_TYPE)
      return true;
  
@@ -226,81 +54,17 @@ index 83a03374a325..da4b7f5daa8c 100644
 -  if (TYPE_MODE (t1) != TYPE_MODE (t2))
 +  /* Can't be compatible types if they have different mode.  Because of
 +     flexible array members, we allow mismatching modes for structures or
-+     unions and for arrays when we ignore the size.  */
++     unions.  */
 +  if (!RECORD_OR_UNION_TYPE_P (t1)
-+      && (!ignore_size || TREE_CODE (t1) != ARRAY_TYPE)
-+      && (TYPE_MODE (t1) != TYPE_MODE (t2)))
++      && TYPE_MODE (t1) != TYPE_MODE (t2))
      return false;
  
    /* Non-aggregate types can be handled cheaply.  */
-@@ -13966,15 +13972,19 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
-     {
-     case ARRAY_TYPE:
-       /* Array types are the same if the element types are the same and
--	 the number of elements are the same.  */
-+	 minimum and maximum index are the same.  */
-       if (!gimple_canonical_types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
--						trust_type_canonical)
-+						trust_type_canonical,
-+						ignore_size)
- 	  || TYPE_STRING_FLAG (t1) != TYPE_STRING_FLAG (t2)
- 	  || TYPE_REVERSE_STORAGE_ORDER (t1) != TYPE_REVERSE_STORAGE_ORDER (t2)
- 	  || TYPE_NONALIASED_COMPONENT (t1) != TYPE_NONALIASED_COMPONENT (t2))
- 	return false;
-       else
- 	{
-+	  if (ignore_size)
-+	    return true;
-+
- 	  tree i1 = TYPE_DOMAIN (t1);
- 	  tree i2 = TYPE_DOMAIN (t2);
- 
-@@ -14060,23 +14070,36 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
- 	     f1 || f2;
- 	     f1 = TREE_CHAIN (f1), f2 = TREE_CHAIN (f2))
- 	  {
--	    /* Skip non-fields and zero-sized fields.  */
-+	    /* Skip non-fields and zero-sized fields, except zero-sized
-+	       arrays at the end.  */
- 	    while (f1 && (TREE_CODE (f1) != FIELD_DECL
- 			  || (DECL_SIZE (f1)
--			      && integer_zerop (DECL_SIZE (f1)))))
-+			      && integer_zerop (DECL_SIZE (f1))
-+			      && (TREE_CHAIN (f1)
-+				  || TREE_CODE (TREE_TYPE (f1))
-+				     != ARRAY_TYPE))))
- 	      f1 = TREE_CHAIN (f1);
- 	    while (f2 && (TREE_CODE (f2) != FIELD_DECL
- 			  || (DECL_SIZE (f2)
--			      && integer_zerop (DECL_SIZE (f2)))))
-+			      && integer_zerop (DECL_SIZE (f2))
-+			      && (TREE_CHAIN (f2)
-+				  || TREE_CODE (TREE_TYPE (f2))
-+				     != ARRAY_TYPE))))
- 	      f2 = TREE_CHAIN (f2);
- 	    if (!f1 || !f2)
- 	      break;
--	    /* The fields must have the same name, offset and type.  */
-+
-+	    tree t1 = TREE_TYPE (f1);
-+	    tree t2 = TREE_TYPE (f2);
-+
-+	    /* If the last element is an array, we allow a mismatch in size. */
-+	    bool ignore_size = (TREE_CHAIN (f1) == NULL_TREE
-+				&& TREE_CODE (t1) == ARRAY_TYPE);
-+
- 	    if (DECL_NONADDRESSABLE_P (f1) != DECL_NONADDRESSABLE_P (f2)
- 		|| !gimple_compare_field_offset (f1, f2)
- 		|| !gimple_canonical_types_compatible_p
--		      (TREE_TYPE (f1), TREE_TYPE (f2),
--		       trust_type_canonical))
-+		      (t1, t2, trust_type_canonical, ignore_size))
- 	      return false;
- 	  }
- 
-@@ -14220,6 +14243,10 @@ verify_type (const_tree t)
+@@ -14218,8 +14221,11 @@ verify_type (const_tree t)
+       debug_tree (ct);
+       error_found = true;
      }
- 
+-
    if (COMPLETE_TYPE_P (t) && TYPE_CANONICAL (t)
 +      /* We allow a mismatch for structure or union because of
 +	 flexible array members.  */
@@ -309,22 +73,8 @@ index 83a03374a325..da4b7f5daa8c 100644
        && TYPE_MODE (t) != TYPE_MODE (TYPE_CANONICAL (t)))
      {
        error ("%<TYPE_MODE%> of %<TYPE_CANONICAL%> is not compatible");
-diff --git a/gcc/tree.h b/gcc/tree.h
-index 75054839d9b6..6608754a3e20 100644
---- a/gcc/tree.h
-+++ b/gcc/tree.h
-@@ -5844,7 +5844,8 @@ extern unsigned int tree_map_base_hash (const void *);
- extern bool tree_map_base_marked_p (const void *);
- extern void DEBUG_FUNCTION verify_type (const_tree t);
- extern bool gimple_canonical_types_compatible_p (const_tree, const_tree,
--						 bool trust_type_canonical = true);
-+						 bool trust_type_canonical = true,
-+						 bool ignore_size = false);
- extern bool type_with_interoperable_signedness (const_tree);
- extern bitmap get_nonnull_args (const_tree);
- extern int get_range_pos_neg (tree);
 
-base-commit: 6205144d6b566f32a58c4fa4f5e7e2343ad07c62
+base-commit: 34dfb30ca8dba6bc184e563b0ddc26a5239294e3
 -- 
 2.47.1
 
