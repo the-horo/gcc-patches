@@ -1,9 +1,10 @@
-6	????
+6	10 Dec 2024
 
 	U 04_all_nossp-on-nostdlib.patch
 	U 15_all_DEF_GENTOO_GLIBCXX_ASSERTIONS.patch
 	U 24_all_DEF_GENTOO_SCP-fstack-clash-protection.patch
 	U 26_all_enable-cet.patch
+	+ 70_all_PR117854-config-nvptx-fix-bashisms-with-gen-copyright.sh-use.patch
 
 5	1 Dec 2024
 
