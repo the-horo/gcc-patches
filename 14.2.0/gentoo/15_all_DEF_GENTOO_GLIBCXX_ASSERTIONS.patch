@@ -5,7 +5,7 @@ https://bugs.gentoo.org/876895
  	  cpp_define (pfile, "__cpp_rtti=199711L");
  	}
  
-+      #ifdef DEF_GENTOO_GLIBCXX_ASSERTIONS
++      #if defined(DEF_GENTOO_GLIBCXX_ASSERTIONS) && !defined(ACCEL_COMPILER)
 +	  cpp_define (pfile, "_GLIBCXX_ASSERTIONS");
 +      #endif
 +

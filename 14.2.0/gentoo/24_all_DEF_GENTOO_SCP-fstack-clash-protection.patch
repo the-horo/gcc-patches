@@ -19,7 +19,7 @@ We add -fstack-clash-protection if requested
  
 +/* Default value for flag_clash_protector when flag_clash_protector is
 +   initialized to -1.  */
-+#ifdef DEF_GENTOO_SCP
++#if defined(DEF_GENTOO_SCP) && !defined(ACCEL_COMPILER)
 +#define DEFAULT_FLAG_SCP 1
 +#endif
 +#ifndef DEFAULT_FLAG_SCP

@@ -1,3 +1,10 @@
+6	????
+
+	U 04_all_nossp-on-nostdlib.patch
+	U 15_all_DEF_GENTOO_GLIBCXX_ASSERTIONS.patch
+	U 24_all_DEF_GENTOO_SCP-fstack-clash-protection.patch
+	U 26_all_enable-cet.patch
+
 5	1 Dec 2024
 
 	- 77_all_m2_docs_sandbox.patch
