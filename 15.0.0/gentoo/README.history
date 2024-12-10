@@ -2,6 +2,7 @@
 
 	+ 74_all_PR117724-Fix-type-compatibility-for-types-with-flexible-array.patch
 	+ 75_all_PR117724-testsuite-fix-LTO-flags-in-pr112716.c.patch
+	+ 76_all_PR117854-config-nvptx-fix-bashisms-with-gen-copyright.sh-use.patch
 
 30	8 December 2024
 
