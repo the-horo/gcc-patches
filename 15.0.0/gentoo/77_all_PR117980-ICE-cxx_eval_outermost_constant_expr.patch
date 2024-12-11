@@ -1,0 +1,13 @@
+diff --git a/gcc/cp/cp-gimplify.cc b/gcc/cp/cp-gimplify.cc
+index 623e2ee6e964..a861331c7c7d 100644
+--- a/gcc/cp/cp-gimplify.cc
++++ b/gcc/cp/cp-gimplify.cc
+@@ -1477,7 +1477,7 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
+ 	  *walk_subtrees = 0;
+ 	  if (!flag_no_inline)
+ 	    {
+-	      tree folded = maybe_constant_init (init, TARGET_EXPR_SLOT (stmt));
++	      tree folded = maybe_constant_init (init);
+ 	      if (folded != init && TREE_CONSTANT (folded))
+ 		init = folded;
+ 	    }
