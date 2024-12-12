@@ -1,3 +1,8 @@
+32	????
+
+	- 74_all_PR117724-Fix-type-compatibility-for-types-with-flexible-array.patch
+	- 75_all_PR117724-Fix-type-compatibility-for-types-with-flexible-array-2.patch
+
 31	10 December 2024
 
 	U 24_all_DEF_GENTOO_SCP-fstack-clash-protection.patch
