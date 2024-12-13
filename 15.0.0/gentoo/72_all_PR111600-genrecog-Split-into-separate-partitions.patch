@@ -1,5 +1,5 @@
-From 1135970eb38c8f90db20c12cb4222e3a5214557e Mon Sep 17 00:00:00 2001
-Message-ID: <1135970eb38c8f90db20c12cb4222e3a5214557e.1732630692.git.sam@gentoo.org>
+From eea603288d8d6cfd795c42c8f731d06f8af6828a Mon Sep 17 00:00:00 2001
+Message-ID: <eea603288d8d6cfd795c42c8f731d06f8af6828a.1734090687.git.sam@gentoo.org>
 From: Robin Dapp <rdapp.gcc@gmail.com>
 Date: Tue, 26 Nov 2024 14:44:17 +0100
 Subject: [PATCH] genrecog: Split into separate partitions [PR111600].
@@ -55,6 +55,7 @@ gcc/ChangeLog:
 	* read-md.h (class md_reader): Ditto.
 ---
  gcc/Makefile.in      |  29 ++-
+ gcc/configure        |   4 +-
  gcc/configure.ac     |   4 +-
  gcc/genconditions.cc |   4 +-
  gcc/genpreds.cc      |   4 +-
@@ -62,10 +63,10 @@ gcc/ChangeLog:
  gcc/gentarget-def.cc |   2 +-
  gcc/read-md.cc       |   4 +-
  gcc/read-md.h        |   2 +-
- 8 files changed, 358 insertions(+), 243 deletions(-)
+ 9 files changed, 360 insertions(+), 245 deletions(-)
 
 diff --git a/gcc/Makefile.in b/gcc/Makefile.in
-index ead8d2eb094c..d301bef47003 100644
+index 27fbbd4bf19e..493ec6a5cb6e 100644
 --- a/gcc/Makefile.in
 +++ b/gcc/Makefile.in
 @@ -239,6 +239,12 @@ INSNEMIT_SEQ_SRC = $(patsubst %, insn-emit-%.cc, $(INSNEMIT_SPLITS_SEQ))
@@ -90,7 +91,7 @@ index ead8d2eb094c..d301bef47003 100644
  	insn-enums.o \
  	ggc-page.o \
  	adjust-alignment.o \
-@@ -1903,8 +1909,8 @@ TREECHECKING = @TREECHECKING@
+@@ -1909,8 +1915,8 @@ TREECHECKING = @TREECHECKING@
  FULL_DRIVER_NAME=$(target_noncanonical)-gcc-$(version)$(exeext)
  
  MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
@@ -101,7 +102,7 @@ index ead8d2eb094c..d301bef47003 100644
   insn-attr.h insn-attr-common.h insn-attrtab.cc insn-dfatab.cc \
   insn-latencytab.cc insn-opinit.cc insn-opinit.h insn-preds.cc insn-constants.h \
   tm-preds.h tm-constrs.h checksum-options $(GIMPLE_MATCH_PD_SEQ_SRC) \
-@@ -2671,7 +2677,8 @@ $(common_out_object_file): $(common_out_file)
+@@ -2677,7 +2683,8 @@ $(common_out_object_file): $(common_out_file)
  # and compile them.
  
  .PRECIOUS: insn-config.h insn-flags.h insn-codes.h insn-constants.h \
@@ -111,7 +112,7 @@ index ead8d2eb094c..d301bef47003 100644
    insn-peep.cc insn-attr.h insn-attr-common.h insn-attrtab.cc \
    insn-dfatab.cc insn-latencytab.cc insn-preds.cc \
    $(GIMPLE_MATCH_PD_SEQ_SRC) $(GENERIC_MATCH_PD_SEQ_SRC) \
-@@ -2700,7 +2707,7 @@ simple_rtl_generated_h	= insn-attr.h insn-attr-common.h insn-codes.h \
+@@ -2706,7 +2713,7 @@ simple_rtl_generated_h	= insn-attr.h insn-attr-common.h insn-codes.h \
  
  simple_rtl_generated_c	= insn-automata.cc \
  			  insn-extract.cc insn-output.cc \
@@ -120,7 +121,7 @@ index ead8d2eb094c..d301bef47003 100644
  
  simple_generated_h	= $(simple_rtl_generated_h) insn-constants.h
  
-@@ -2738,6 +2745,18 @@ s-tmp-emit: build/genemit$(build_exeext) $(MD_DEPS) insn-conditions.md
+@@ -2744,6 +2751,18 @@ s-tmp-emit: build/genemit$(build_exeext) $(MD_DEPS) insn-conditions.md
  	  insn-emit-$(id).cc;)
  	$(STAMP) s-tmp-emit
  
@@ -139,11 +140,33 @@ index ead8d2eb094c..d301bef47003 100644
  # gencheck doesn't read the machine description, and the file produced
  # doesn't use the insn-* convention.
  
+diff --git a/gcc/configure b/gcc/configure
+index 0a55fa75573b..a8b531d8fae0 100755
+--- a/gcc/configure
++++ b/gcc/configure
+@@ -1873,7 +1873,7 @@ Optional Packages:
+                           generic when splitting match.pd. [default=10]
+   --with-insnemit-partitions=num
+                           Set the number of partitions of insn-emit.cc for
+-                          genemit to create. [default=10]
++                          genemit and genrecog to create. [default=10]
+   --with-dwarf2           force the default debug format to be DWARF 2 (or
+                           later)
+   --with-specs=SPECS      add SPECS to driver command-line processing
+@@ -7936,7 +7936,7 @@ fi
+ 
+ 
+ 
+-# Specify the number of splits of insn-emit.cc to generate.
++# Specify the number of splits of insn-emit.cc and insn-recog.cc to generate.
+ 
+ # Check whether --with-insnemit-partitions was given.
+ if test "${with_insnemit_partitions+set}" = set; then :
 diff --git a/gcc/configure.ac b/gcc/configure.ac
-index c546432b2775..a0d9038ea595 100644
+index 1a6f01e25675..77fab885a428 100644
 --- a/gcc/configure.ac
 +++ b/gcc/configure.ac
-@@ -913,10 +913,10 @@ fi
+@@ -929,10 +929,10 @@ fi
  
  AC_SUBST(DEFAULT_MATCHPD_PARTITIONS)
  
@@ -195,7 +218,7 @@ index 55d149e8a404..b8f3bf279d97 100644
  		  "        SET_HARD_REG_BIT (%s[%d], regno);\n",
  		  "this_target_constraints->register_filters", i);
 diff --git a/gcc/genrecog.cc b/gcc/genrecog.cc
-index ba09ec3b6005..7f7ca728bbe0 100644
+index 719b1d44387e..1852ceba2513 100644
 --- a/gcc/genrecog.cc
 +++ b/gcc/genrecog.cc
 @@ -4255,9 +4255,9 @@ match_pattern (state *s, md_rtx_info *info, rtx pattern,
@@ -1363,7 +1386,7 @@ index e613c42b7241..b42add391ed8 100644
    /* Defined in read-rtl.cc.  */
    const char *apply_iterator_to_string (const char *string);
 
-base-commit: a22dfe208d94105a6e587a3b25e8fe8d62444d8a
+base-commit: 6a5a1b8175e07ff578204476cd11115d8a071cbc
 -- 
 2.47.1
 
