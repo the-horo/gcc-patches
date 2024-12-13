@@ -1,4 +1,64 @@
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=117980#c7
+https://inbox.sourceware.org/gcc-patches/20241212184222.471783-1-polacek@redhat.com/
+
+From f9ec39fcb8905fad2aba87bf328f0d5934b2385d Mon Sep 17 00:00:00 2001
+Message-ID: <f9ec39fcb8905fad2aba87bf328f0d5934b2385d.1734066473.git.sam@gentoo.org>
+From: Marek Polacek <polacek@redhat.com>
+Date: Thu, 12 Dec 2024 13:42:22 -0500
+Subject: [PATCH] c++: ICE in TARGET_EXPR evaluation in cp_fold_r [PR117980]
+
+This ICE started with the recent prvalue optimization (r15-6052).  In
+cp_fold_r we have:
+
+      if (tree &init = TARGET_EXPR_INITIAL (stmt))
+        {
+          cp_walk_tree (&init, cp_fold_r, data, NULL);
+          // ...
+	  tree folded = maybe_constant_init (init, TARGET_EXPR_SLOT (stmt));
+
+What can happen here is that originally the TARGET_EXPR is:
+
+    TARGET_EXPR <D.2747, <<< Unknown tree: aggr_init_expr
+      5
+      __ct_comp
+      D.2747
+      (struct subrange *) <<< Unknown tree: void_cst >>>
+      &TARGET_EXPR <D.2707, {.it=TARGET_EXPR <D.2695, ...>}> >>>>
+
+but after the first cp_walk_tree we fold the D.2707 TARGET_EXPR into:
+
+    TARGET_EXPR <D.2707, <<< Unknown tree: expr_stmt
+      D.2707.it = TARGET_EXPR <D.2695, ...> >>>>
+
+and then we pass the EXPR_STMT to maybe_constant_init, with D.2707 as
+the object.  But their types don't match anymore, so we crash.  We'd
+have to pass D.2707.it as the object for it to work.
+
+But I don't think we need to pass any object to maybe_constant_init;
+it'll grab the appropriate one itself.
+
+constexpr-prvalue3.C is reduced from a large std::ranges libstdc++ test.
+
+	PR c++/117980
+
+gcc/cp/ChangeLog:
+
+	* cp-gimplify.cc (cp_fold_r) <case TARGET_EXPR>: Don't pass an object
+	to maybe_constant_init.
+
+gcc/testsuite/ChangeLog:
+
+* g++.dg/cpp0x/constexpr-prvalue2.C: New test.
+	* g++.dg/cpp0x/constexpr-prvalue3.C: New test.
+---
+ gcc/cp/cp-gimplify.cc                         |  2 +-
+ .../g++.dg/cpp0x/constexpr-prvalue2.C         | 15 +++++++++++
+ .../g++.dg/cpp0x/constexpr-prvalue3.C         | 26 +++++++++++++++++++
+ 3 files changed, 42 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/constexpr-prvalue2.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/constexpr-prvalue3.C
+
+diff --git a/gcc/cp/cp-gimplify.cc b/gcc/cp/cp-gimplify.cc
+index 623e2ee6e964..a861331c7c7d 100644
 --- a/gcc/cp/cp-gimplify.cc
 +++ b/gcc/cp/cp-gimplify.cc
 @@ -1477,7 +1477,7 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
@@ -10,3 +70,61 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=117980#c7
  	      if (folded != init && TREE_CONSTANT (folded))
  		init = folded;
  	    }
+diff --git a/gcc/testsuite/g++.dg/cpp0x/constexpr-prvalue2.C b/gcc/testsuite/g++.dg/cpp0x/constexpr-prvalue2.C
+new file mode 100644
+index 000000000000..46053231cf83
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/constexpr-prvalue2.C
+@@ -0,0 +1,15 @@
++// PR c++/117980
++// { dg-do compile { target c++11 } }
++// { dg-options "-O" }
++
++struct S {
++  constexpr S(S &); // { dg-warning "used but never defined" }
++  ~S();
++};
++struct B {
++  S s;
++};
++struct A {
++  B b;
++};
++void fn(B b) { A{b}; }
+diff --git a/gcc/testsuite/g++.dg/cpp0x/constexpr-prvalue3.C b/gcc/testsuite/g++.dg/cpp0x/constexpr-prvalue3.C
+new file mode 100644
+index 000000000000..a2eb12c02d74
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/constexpr-prvalue3.C
+@@ -0,0 +1,26 @@
++// PR c++/117980
++// { dg-do compile { target c++11 } }
++// { dg-options "-O" }
++
++struct _Safe_iterator  {
++ _Safe_iterator();
++  ~_Safe_iterator();
++};
++template <typename _Tp>
++struct vector {
++  vector(int) {}
++  constexpr _Safe_iterator end() {
++    return _Safe_iterator();
++  }
++};
++template <typename It> struct sentinel {
++  It it;
++};
++template <typename _Sent>
++struct subrange {
++  subrange(sentinel<_Safe_iterator>) {}
++};
++void test01() {
++  vector<int> v{0};
++  subrange<sentinel<_Safe_iterator>>{sentinel<_Safe_iterator>{v.end()}};
++}
+
+base-commit: d136fa00f0d5faff8397edcd7e4ebb3445ab21b0
+-- 
+2.47.1
+
