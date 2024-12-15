@@ -30,4 +30,3 @@
 	+ 29_all_tar_libstdc++-link.patch
 	+ 75_all_x86_PR99703_12_no-cet-for-i486.patch
 	+ 76_all_all_PR103910_12_ICE-on-PCH.patch
-	+ 77_all_PR115917-ada-lto.patch
