@@ -34,7 +34,7 @@ index d0a86acb832c..b140de0eb76d 100644
  # <http://www.gnu.org/licenses/>.
  
 -style="$1"
-+style="${1:-${NVPTX_GEN_COPYRIGHT}}"
++style="${NVPTX_GEN_COPYRIGHT}"
  case $style in
      opt)
      ;;
