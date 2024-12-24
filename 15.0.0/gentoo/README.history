@@ -1,3 +1,7 @@
+34	24 December 2024
+
+	U 76_all_PR117854-config-nvptx-fix-bashisms-with-gen-copyright.sh-use.patch
+
 33	22 December 2024
 
 	- 77_all_PR117980-ICE-cxx_eval_outermost_constant_expr.patch
