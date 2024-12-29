@@ -1,6 +1,7 @@
 35	????
 
 	- 79_all_PR118124-c-Fix-ICEs-with-large-initializer-lists-or-ones-i.patch
+	+ 79_all_PR32491-fix-binutils-arm-check.patch
 
 34	24 December 2024
 
