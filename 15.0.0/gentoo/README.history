@@ -1,3 +1,7 @@
+37	????
+
+	+ 80_all_PR81358-Enable-automatic-linking-of-libatomic.patch
+
 36	5 January 2025
 
 	- 73_all_PR117629-c-special-case-some-bool-errors-with-C23.patch
