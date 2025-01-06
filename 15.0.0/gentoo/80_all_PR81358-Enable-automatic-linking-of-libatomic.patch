@@ -1,0 +1,536 @@
+https://inbox.sourceware.org/gcc-patches/IA1PR12MB90310A559B28E87BF456C942CE072@IA1PR12MB9031.namprd12.prod.outlook.com/#t
+
+PR81358: Enable automatic linking of libatomic.
+
+ChangeLog:
+	PR driver/81358
+	* Makefile.def: Add dependencies so libatomic is built before target
+	libraries are configured.
+	* Makefile.tpl: Export TARGET_CONFIGDIRS.
+	* configure.ac: Add libatomic to bootstrap_target_libs.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+
+gcc/ChangeLog:
+	PR driver/81358
+	* common.opt: New option -flink-libatomic.
+	* gcc.cc (LINK_LIBATOMIC_SPEC): New macro.
+	* config/gnu-user.h (GNU_USER_TARGET_LINK_GCC_C_SEQUENCE_SPEC): Use
+	LINK_LIBATOMIC_SPEC.
+	* doc/invoke.texi: Document -flink-libatomic.
+	* configure.ac: Define TARGET_PROVIDES_LIBATOMIC.
+	* configure: Regenerate.
+	* config.in: Regenerate.
+
+libatomic/ChangeLog:
+	PR driver/81358
+	* Makefile.am: Pass -fno-link-libatomic.
+	New rule all.
+	* configure.ac: Assert that CFLAGS is set and pass -fno-link-libatomic. 
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+
+Signed-off-by: Prathamesh Kulkarni <prathameshk@nvidia.com>
+Co-authored-by: Matthew Malcolmson <mmalcolmson@nvidia.com>
+
+diff --git a/Makefile.def b/Makefile.def
+index 19954e7d731..90899fa28cf 100644
+--- a/Makefile.def
++++ b/Makefile.def
+@@ -656,6 +656,26 @@ lang_env_dependencies = { module=libgcc; no_gcc=true; no_c=true; };
+ // a dependency on libgcc for native targets to configure.
+ lang_env_dependencies = { module=libiberty; no_c=true; };
+ 
++dependencies = { module=configure-target-libbacktrace; on=all-target-libatomic; };
++dependencies = { module=configure-target-libgloss; on=all-target-libatomic; };
++dependencies = { module=configure-target-newlib; on=all-target-libatomic; };
++dependencies = { module=configure-target-libgomp; on=all-target-libatomic; };
++dependencies = { module=configure-target-libitm; on=all-target-libatomic; };
++dependencies = { module=configure-target-libstdc++v3; on=all-target-libatomic; };
++dependencies = { module=configure-target-libsanitizer; on=all-target-libatomic; };
++dependencies = { module=configure-target-libvtv; on=all-target-libatomic; };
++dependencies = { module=configure-target-libssp; on=all-target-libatomic; };
++dependencies = { module=configure-target-libquadmath; on=all-target-libatomic; };
++dependencies = { module=configure-target-libgfortran; on=all-target-libatomic; };
++dependencies = { module=configure-target-libffi; on=all-target-libatomic; };
++dependencies = { module=configure-target-libobjc; on=all-target-libatomic; };
++dependencies = { module=configure-target-libada; on=all-target-libatomic; };
++dependencies = { module=configure-target-libgm2; on=all-target-libatomic; };
++dependencies = { module=configure-target-libgo; on=all-target-libatomic; };
++dependencies = { module=configure-target-libgrust; on=all-target-libatomic; };
++dependencies = { module=configure-target-libphobos; on=all-target-libatomic; };
++dependencies = { module=configure-target-zlib; on=all-target-libatomic; };
++
+ dependencies = { module=configure-target-fastjar; on=configure-target-zlib; };
+ dependencies = { module=all-target-fastjar; on=all-target-zlib; };
+ dependencies = { module=configure-target-libgo; on=configure-target-libffi; };
+diff --git a/Makefile.in b/Makefile.in
+index 966d6045496..4a85f11d7e6 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -242,6 +242,7 @@ HOST_EXPORTS = \
+ 	GMPINC="$(HOST_GMPINC)"; export GMPINC; \
+ 	ISLLIBS="$(HOST_ISLLIBS)"; export ISLLIBS; \
+ 	ISLINC="$(HOST_ISLINC)"; export ISLINC; \
++	TARGET_CONFIGDIRS="$(TARGET_CONFIGDIRS)"; export TARGET_CONFIGDIRS; \
+ 	XGCC_FLAGS_FOR_TARGET="$(XGCC_FLAGS_FOR_TARGET)"; export XGCC_FLAGS_FOR_TARGET; \
+ @if gcc-bootstrap
+ 	$(RPATH_ENVVAR)=`echo "$(TARGET_LIB_PATH)$$$(RPATH_ENVVAR)" | sed 's,::*,:,g;s,^:*,,;s,:*$$,,'`; export $(RPATH_ENVVAR); \
+@@ -68551,6 +68552,66 @@ all-flex: maybe-all-build-bison
+ all-flex: maybe-all-m4
+ all-flex: maybe-all-build-texinfo
+ all-m4: maybe-all-build-texinfo
++configure-target-libbacktrace: maybe-all-target-libatomic
++configure-stage1-target-libbacktrace: maybe-all-stage1-target-libatomic
++configure-stage2-target-libbacktrace: maybe-all-stage2-target-libatomic
++configure-stage3-target-libbacktrace: maybe-all-stage3-target-libatomic
++configure-stage4-target-libbacktrace: maybe-all-stage4-target-libatomic
++configure-stageprofile-target-libbacktrace: maybe-all-stageprofile-target-libatomic
++configure-stagetrain-target-libbacktrace: maybe-all-stagetrain-target-libatomic
++configure-stagefeedback-target-libbacktrace: maybe-all-stagefeedback-target-libatomic
++configure-stageautoprofile-target-libbacktrace: maybe-all-stageautoprofile-target-libatomic
++configure-stageautofeedback-target-libbacktrace: maybe-all-stageautofeedback-target-libatomic
++configure-target-libgomp: maybe-all-target-libatomic
++configure-stage1-target-libgomp: maybe-all-stage1-target-libatomic
++configure-stage2-target-libgomp: maybe-all-stage2-target-libatomic
++configure-stage3-target-libgomp: maybe-all-stage3-target-libatomic
++configure-stage4-target-libgomp: maybe-all-stage4-target-libatomic
++configure-stageprofile-target-libgomp: maybe-all-stageprofile-target-libatomic
++configure-stagetrain-target-libgomp: maybe-all-stagetrain-target-libatomic
++configure-stagefeedback-target-libgomp: maybe-all-stagefeedback-target-libatomic
++configure-stageautoprofile-target-libgomp: maybe-all-stageautoprofile-target-libatomic
++configure-stageautofeedback-target-libgomp: maybe-all-stageautofeedback-target-libatomic
++configure-target-libsanitizer: maybe-all-target-libatomic
++configure-stage1-target-libsanitizer: maybe-all-stage1-target-libatomic
++configure-stage2-target-libsanitizer: maybe-all-stage2-target-libatomic
++configure-stage3-target-libsanitizer: maybe-all-stage3-target-libatomic
++configure-stage4-target-libsanitizer: maybe-all-stage4-target-libatomic
++configure-stageprofile-target-libsanitizer: maybe-all-stageprofile-target-libatomic
++configure-stagetrain-target-libsanitizer: maybe-all-stagetrain-target-libatomic
++configure-stagefeedback-target-libsanitizer: maybe-all-stagefeedback-target-libatomic
++configure-stageautoprofile-target-libsanitizer: maybe-all-stageautoprofile-target-libatomic
++configure-stageautofeedback-target-libsanitizer: maybe-all-stageautofeedback-target-libatomic
++configure-target-libvtv: maybe-all-target-libatomic
++configure-stage1-target-libvtv: maybe-all-stage1-target-libatomic
++configure-stage2-target-libvtv: maybe-all-stage2-target-libatomic
++configure-stage3-target-libvtv: maybe-all-stage3-target-libatomic
++configure-stage4-target-libvtv: maybe-all-stage4-target-libatomic
++configure-stageprofile-target-libvtv: maybe-all-stageprofile-target-libatomic
++configure-stagetrain-target-libvtv: maybe-all-stagetrain-target-libatomic
++configure-stagefeedback-target-libvtv: maybe-all-stagefeedback-target-libatomic
++configure-stageautoprofile-target-libvtv: maybe-all-stageautoprofile-target-libatomic
++configure-stageautofeedback-target-libvtv: maybe-all-stageautofeedback-target-libatomic
++configure-target-libphobos: maybe-all-target-libatomic
++configure-stage1-target-libphobos: maybe-all-stage1-target-libatomic
++configure-stage2-target-libphobos: maybe-all-stage2-target-libatomic
++configure-stage3-target-libphobos: maybe-all-stage3-target-libatomic
++configure-stage4-target-libphobos: maybe-all-stage4-target-libatomic
++configure-stageprofile-target-libphobos: maybe-all-stageprofile-target-libatomic
++configure-stagetrain-target-libphobos: maybe-all-stagetrain-target-libatomic
++configure-stagefeedback-target-libphobos: maybe-all-stagefeedback-target-libatomic
++configure-stageautoprofile-target-libphobos: maybe-all-stageautoprofile-target-libatomic
++configure-stageautofeedback-target-libphobos: maybe-all-stageautofeedback-target-libatomic
++configure-target-zlib: maybe-all-target-libatomic
++configure-stage1-target-zlib: maybe-all-stage1-target-libatomic
++configure-stage2-target-zlib: maybe-all-stage2-target-libatomic
++configure-stage3-target-zlib: maybe-all-stage3-target-libatomic
++configure-stage4-target-zlib: maybe-all-stage4-target-libatomic
++configure-stageprofile-target-zlib: maybe-all-stageprofile-target-libatomic
++configure-stagetrain-target-zlib: maybe-all-stagetrain-target-libatomic
++configure-stagefeedback-target-zlib: maybe-all-stagefeedback-target-libatomic
++configure-stageautoprofile-target-zlib: maybe-all-stageautoprofile-target-libatomic
++configure-stageautofeedback-target-zlib: maybe-all-stageautofeedback-target-libatomic
+ configure-target-libgo: maybe-configure-target-libffi
+ all-target-libgo: maybe-all-target-libffi
+ configure-target-libphobos: maybe-configure-target-libbacktrace
+@@ -68678,6 +68739,45 @@ configure-m4: stage_last
+ @endif gcc-bootstrap
+ 
+ @if gcc-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libgloss: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-newlib: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libitm: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libstdc++v3: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libssp: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libquadmath: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libgfortran: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libffi: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libobjc: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libada: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libgm2: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libgo: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
++@unless target-libatomic-bootstrap
++configure-target-libgrust: maybe-all-target-libatomic
++@endunless target-libatomic-bootstrap
+ @unless target-zlib-bootstrap
+ configure-target-fastjar: maybe-configure-target-zlib
+ @endunless target-zlib-bootstrap
+@@ -68755,6 +68855,19 @@ all-fastjar: maybe-all-libiberty
+ all-bison: maybe-all-gettext
+ all-flex: maybe-all-gettext
+ all-m4: maybe-all-gettext
++configure-target-libgloss: maybe-all-target-libatomic
++configure-target-newlib: maybe-all-target-libatomic
++configure-target-libitm: maybe-all-target-libatomic
++configure-target-libstdc++v3: maybe-all-target-libatomic
++configure-target-libssp: maybe-all-target-libatomic
++configure-target-libquadmath: maybe-all-target-libatomic
++configure-target-libgfortran: maybe-all-target-libatomic
++configure-target-libffi: maybe-all-target-libatomic
++configure-target-libobjc: maybe-all-target-libatomic
++configure-target-libada: maybe-all-target-libatomic
++configure-target-libgm2: maybe-all-target-libatomic
++configure-target-libgo: maybe-all-target-libatomic
++configure-target-libgrust: maybe-all-target-libatomic
+ configure-target-fastjar: maybe-configure-target-zlib
+ all-target-fastjar: maybe-all-target-zlib
+ configure-target-libgo: maybe-all-target-libstdc++-v3
+diff --git a/Makefile.tpl b/Makefile.tpl
+index da38dca697a..c6b2f7504ad 100644
+--- a/Makefile.tpl
++++ b/Makefile.tpl
+@@ -245,6 +245,7 @@ HOST_EXPORTS = \
+ 	GMPINC="$(HOST_GMPINC)"; export GMPINC; \
+ 	ISLLIBS="$(HOST_ISLLIBS)"; export ISLLIBS; \
+ 	ISLINC="$(HOST_ISLINC)"; export ISLINC; \
++	TARGET_CONFIGDIRS="$(TARGET_CONFIGDIRS)"; export TARGET_CONFIGDIRS; \
+ 	XGCC_FLAGS_FOR_TARGET="$(XGCC_FLAGS_FOR_TARGET)"; export XGCC_FLAGS_FOR_TARGET; \
+ @if gcc-bootstrap
+ 	$(RPATH_ENVVAR)=`echo "$(TARGET_LIB_PATH)$$$(RPATH_ENVVAR)" | sed 's,::*,:,g;s,^:*,,;s,:*$$,,'`; export $(RPATH_ENVVAR); \
+diff --git a/configure b/configure
+index 4ae8e1242af..532e4527719 100755
+--- a/configure
++++ b/configure
+@@ -10924,6 +10924,11 @@ if echo " ${target_configdirs} " | grep " libgomp " > /dev/null 2>&1 ; then
+   bootstrap_target_libs=${bootstrap_target_libs}target-libgomp,
+ fi
+ 
++# If we are building libatomic, bootstrap it.
++if echo " ${target_configdirs} " | grep " libatomic " > /dev/null 2>&1 ; then
++  bootstrap_target_libs=${bootstrap_target_libs}target-libatomic,
++fi
++
+ # If we are building libsanitizer and $BUILD_CONFIG contains bootstrap-asan
+ # or bootstrap-ubsan, bootstrap it.
+ if echo " ${target_configdirs} " | grep " libsanitizer " > /dev/null 2>&1; then
+diff --git a/configure.ac b/configure.ac
+index 9a72b2311bd..c44d84f32ce 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3151,6 +3151,11 @@ if echo " ${target_configdirs} " | grep " libgomp " > /dev/null 2>&1 ; then
+   bootstrap_target_libs=${bootstrap_target_libs}target-libgomp,
+ fi
+ 
++# If we are building libatomic, bootstrap it.
++if echo " ${target_configdirs} " | grep " libatomic " > /dev/null 2>&1 ; then
++  bootstrap_target_libs=${bootstrap_target_libs}target-libatomic,
++fi
++
+ # If we are building libsanitizer and $BUILD_CONFIG contains bootstrap-asan
+ # or bootstrap-ubsan, bootstrap it.
+ if echo " ${target_configdirs} " | grep " libsanitizer " > /dev/null 2>&1; then
+diff --git a/gcc/common.opt b/gcc/common.opt
+index 1b72826d44b..30530cc8b71 100644
+--- a/gcc/common.opt
++++ b/gcc/common.opt
+@@ -3361,6 +3361,9 @@ Use the Modern linker (MOLD) linker instead of the default linker.
+ fuse-linker-plugin
+ Common Undocumented Var(flag_use_linker_plugin)
+ 
++flink-libatomic
++Common Driver Var(flag_link_libatomic) Init(1)
++
+ ; Positive if we should track variables, negative if we should run
+ ; the var-tracking pass only to discard debug annotations, zero if
+ ; we're not to run it.
+diff --git a/gcc/config.in b/gcc/config.in
+index d8145a1453b..b5060d2c0c8 100644
+--- a/gcc/config.in
++++ b/gcc/config.in
+@@ -2558,6 +2558,12 @@
+ #endif
+ 
+ 
++/* Define if libatomic is built for the target */
++#ifndef USED_FOR_TARGET
++#undef TARGET_PROVIDES_LIBATOMIC
++#endif
++
++
+ /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
+ #ifndef USED_FOR_TARGET
+ #undef TIME_WITH_SYS_TIME
+diff --git a/gcc/config/gnu-user.h b/gcc/config/gnu-user.h
+index f7eefdafe8b..27d0ef07e1e 100644
+--- a/gcc/config/gnu-user.h
++++ b/gcc/config/gnu-user.h
+@@ -109,8 +109,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ #define LINK_EH_SPEC "%{!static|static-pie:--eh-frame-hdr} "
+ #endif
+ 
++
+ #define GNU_USER_TARGET_LINK_GCC_C_SEQUENCE_SPEC \
+-  "%{static|static-pie:--start-group} %G %{!nolibc:%L} \
++  "%{static|static-pie:--start-group} %G %{!nolibc:" LINK_LIBATOMIC_SPEC "%L} \
+    %{static|static-pie:--end-group}%{!static:%{!static-pie:%G}}"
+ 
+ #undef LINK_GCC_C_SEQUENCE_SPEC
+diff --git a/gcc/configure b/gcc/configure
+index a8b531d8fae..6793d97820d 100755
+--- a/gcc/configure
++++ b/gcc/configure
+@@ -33420,6 +33420,12 @@ $as_echo "#define ENABLE_DEFAULT_SSP 1" >>confdefs.h
+ fi
+ 
+ 
++if echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
++
++$as_echo "#define TARGET_PROVIDES_LIBATOMIC 1" >>confdefs.h
++
++fi
++
+ # Test for <sys/sdt.h> on the target.
+ 
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking sys/sdt.h in the target C library" >&5
+diff --git a/gcc/configure.ac b/gcc/configure.ac
+index 77fab885a42..a6dd5786bd9 100644
+--- a/gcc/configure.ac
++++ b/gcc/configure.ac
+@@ -7011,6 +7011,11 @@ if test x$enable_default_ssp = xyes ; then
+ fi
+ AC_SUBST([enable_default_ssp])
+ 
++if echo " ${TARGET_CONFIGDIRS} " | grep " libatomic " > /dev/null 2>&1 ; then
++  AC_DEFINE(TARGET_PROVIDES_LIBATOMIC, 1,
++	    [Define if libatomic is built for the target])
++fi
++
+ # Test for <sys/sdt.h> on the target.
+ GCC_TARGET_TEMPLATE([HAVE_SYS_SDT_H])
+ AC_CACHE_CHECK([sys/sdt.h in the target C library], [gcc_cv_sys_sdt_h], [
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index 8ed5536365f..edf6c9f8684 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -206,7 +206,7 @@ in the following sections.
+ -fpermitted-flt-eval-methods=@var{standard}
+ -fplan9-extensions  -fsigned-bitfields  -funsigned-bitfields
+ -fsigned-char  -funsigned-char  -fstrict-flex-arrays[=@var{n}]
+--fsso-struct=@var{endianness}}
++-flink-libatomic -fsso-struct=@var{endianness}}
+ 
+ @item C++ Language Options
+ @xref{C++ Dialect Options,,Options Controlling C++ Dialect}.
+@@ -2899,6 +2899,10 @@ The @option{-fstrict_flex_arrays} option interacts with the
+ @option{-Wstrict-flex-arrays} option.  @xref{Warning Options}, for more
+ information.
+ 
++@opindex flink-libatomic
++@item -flink-libatomic
++Enable linking of libatomic if it's supported by target. Enabled by default.
++
+ @opindex fsso-struct
+ @item -fsso-struct=@var{endianness}
+ Set the default scalar storage order of structures and unions to the
+diff --git a/gcc/gcc.cc b/gcc/gcc.cc
+index 92c92996401..43d4c8763cb 100644
+--- a/gcc/gcc.cc
++++ b/gcc/gcc.cc
+@@ -980,6 +980,13 @@ proper position among the other output files.  */
+ 
+ /* Here is the spec for running the linker, after compiling all files.  */
+ 
++#if defined(TARGET_PROVIDES_LIBATOMIC) && defined(USE_LD_AS_NEEDED)
++#define LINK_LIBATOMIC_SPEC "%{!fno-link-libatomic:" LD_AS_NEEDED_OPTION \
++			    " -latomic " LD_NO_AS_NEEDED_OPTION "} "
++#else
++#define LINK_LIBATOMIC_SPEC ""
++#endif
++
+ /* This is overridable by the target in case they need to specify the
+    -lgcc and -lc order specially, yet not require them to override all
+    of LINK_COMMAND_SPEC.  */
+diff --git a/libatomic/Makefile.am b/libatomic/Makefile.am
+index efadd9dcd48..80bb6fbf477 100644
+--- a/libatomic/Makefile.am
++++ b/libatomic/Makefile.am
+@@ -69,7 +69,7 @@ libatomic_darwin_rpath += -Wl,-rpath,@loader_path
+ endif
+ 
+ libatomic_la_LDFLAGS = $(libatomic_version_info) $(libatomic_version_script) \
+-	$(lt_host_flags) $(libatomic_darwin_rpath)
++	-Wc,-fno-link-libatomic $(lt_host_flags) $(libatomic_darwin_rpath)
+ libatomic_la_SOURCES = gload.c gstore.c gcas.c gexch.c glfree.c lock.c init.c \
+ 	fenv.c fence.c flag.c
+ 
+@@ -162,6 +162,11 @@ libatomic_convenience_la_LIBADD = $(libatomic_la_LIBADD)
+ # when it is reloaded during the build of all-multi.
+ all-multi: $(libatomic_la_LIBADD)
+ 
++gcc_objdir = $(MULTIBUILDTOP)../../$(host_subdir)/gcc
++all: all-multi libatomic.la libatomic_convenience.la
++	$(INSTALL_DATA) .libs/libatomic.a $(gcc_objdir)$(MULTISUBDIR)/
++	chmod 644 $(gcc_objdir)$(MULTISUBDIR)/libatomic.a
++
+ # target overrides
+ -include $(tmake_file)
+ 
+diff --git a/libatomic/Makefile.in b/libatomic/Makefile.in
+index 9798e7c09e9..1d0494543d7 100644
+--- a/libatomic/Makefile.in
++++ b/libatomic/Makefile.in
+@@ -421,7 +421,7 @@ libatomic_version_info = -version-info $(libtool_VERSION)
+ @ENABLE_DARWIN_AT_RPATH_TRUE@	-Wc,-nodefaultrpaths \
+ @ENABLE_DARWIN_AT_RPATH_TRUE@	-Wl,-rpath,@loader_path
+ libatomic_la_LDFLAGS = $(libatomic_version_info) $(libatomic_version_script) \
+-	$(lt_host_flags) $(libatomic_darwin_rpath)
++	-Wc,-fno-link-libatomic $(lt_host_flags) $(libatomic_darwin_rpath)
+ 
+ libatomic_la_SOURCES = gload.c gstore.c gcas.c gexch.c glfree.c lock.c \
+ 	init.c fenv.c fence.c flag.c $(am__append_5)
+@@ -458,6 +458,7 @@ libatomic_la_LIBADD = $(foreach s,$(SIZES),$(addsuffix \
+ @ARCH_X86_64_TRUE@@HAVE_IFUNC_TRUE@IFUNC_OPTIONS = -mcx16 -mcx16
+ libatomic_convenience_la_SOURCES = $(libatomic_la_SOURCES)
+ libatomic_convenience_la_LIBADD = $(libatomic_la_LIBADD)
++gcc_objdir = $(MULTIBUILDTOP)../../$(host_subdir)/gcc
+ MULTISRCTOP = 
+ MULTIBUILDTOP = 
+ MULTIDIRS = 
+@@ -901,6 +902,9 @@ vpath % $(strip $(search_path))
+ # makefile fragments to avoid broken *.Ppo getting included into the Makefile
+ # when it is reloaded during the build of all-multi.
+ all-multi: $(libatomic_la_LIBADD)
++all: all-multi libatomic.la libatomic_convenience.la
++	$(INSTALL_DATA) .libs/libatomic.a $(gcc_objdir)$(MULTISUBDIR)/
++	chmod 644 $(gcc_objdir)$(MULTISUBDIR)/libatomic.a
+ 
+ # target overrides
+ -include $(tmake_file)
+diff --git a/libatomic/configure b/libatomic/configure
+index d579bab96f8..0a340276ca6 100755
+--- a/libatomic/configure
++++ b/libatomic/configure
+@@ -3415,6 +3415,26 @@ esac
+ # the wrong, non-multilib-adjusted value will be used in multilibs.
+ # As a side effect, we have to subst CFLAGS ourselves.
+ 
++# AC_PROG_CC sets CFLAGS to "-g -O2" by default (if unset), and
++# then compile conftests with default CFLAGS, leaving no place to temporarily
++# modify CFLAGS and restore them later. However we need to pass
++# -fno-link-libatomic in CFLAGS so conftests compiled in AC_PROG_CC don't fail.
++# Assert that CFLAGS is always set by user so the default setting of CFLAGS by
++# AC_PROG_CC won't be applicable anyway.
++if test -z "${CFLAGS}"; then
++  as_fn_error $? "CFLAGS must be set." "$LINENO" 5
++fi
++
++# In order to override CFLAGS_FOR_TARGET, all of our special flags go
++# in XCFLAGS.  But we need them in CFLAGS during configury.  So put them
++# in both places for now and restore CFLAGS at the end of config.
++save_CFLAGS="$CFLAGS"
++
++# Append -fno-link-libatomic to avoid automatically linking libatomic,
++# while building libatomic itself.
++XCFLAGS="$XCFLAGS -fno-link-libatomic"
++CFLAGS="$save_CFLAGS $XCFLAGS"
++
+ 
+ 
+ ac_ext=c
+@@ -4593,11 +4613,6 @@ fi
+ 
+ 
+ 
+-# In order to override CFLAGS_FOR_TARGET, all of our special flags go
+-# in XCFLAGS.  But we need them in CFLAGS during configury.  So put them
+-# in both places for now and restore CFLAGS at the end of config.
+-save_CFLAGS="$CFLAGS"
+-
+ # Find other programs we need.
+ if test -n "$ac_tool_prefix"; then
+   # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
+@@ -11456,7 +11471,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11459 "configure"
++#line 11474 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -11562,7 +11577,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11565 "configure"
++#line 11580 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+diff --git a/libatomic/configure.ac b/libatomic/configure.ac
+index 32a2cdb13ae..23a9695be36 100644
+--- a/libatomic/configure.ac
++++ b/libatomic/configure.ac
+@@ -129,6 +129,26 @@ AC_SUBST(toolexeclibdir)
+ # the wrong, non-multilib-adjusted value will be used in multilibs.
+ # As a side effect, we have to subst CFLAGS ourselves.
+ 
++# AC_PROG_CC sets CFLAGS to "-g -O2" by default (if unset), and
++# then compile conftests with default CFLAGS, leaving no place to temporarily
++# modify CFLAGS and restore them later. However we need to pass
++# -fno-link-libatomic in CFLAGS so conftests compiled in AC_PROG_CC don't fail.
++# Assert that CFLAGS is always set by user so the default setting of CFLAGS by
++# AC_PROG_CC won't be applicable anyway.
++if test -z "${CFLAGS}"; then
++  AC_MSG_ERROR([CFLAGS must be set.])
++fi
++
++# In order to override CFLAGS_FOR_TARGET, all of our special flags go
++# in XCFLAGS.  But we need them in CFLAGS during configury.  So put them
++# in both places for now and restore CFLAGS at the end of config.
++save_CFLAGS="$CFLAGS"
++
++# Append -fno-link-libatomic to avoid automatically linking libatomic,
++# while building libatomic itself.
++XCFLAGS="$XCFLAGS -fno-link-libatomic"
++CFLAGS="$save_CFLAGS $XCFLAGS"
++
+ m4_rename([_AC_ARG_VAR_PRECIOUS],[real_PRECIOUS])
+ m4_define([_AC_ARG_VAR_PRECIOUS],[])
+ AC_PROG_CC
+@@ -137,11 +157,6 @@ m4_rename_force([real_PRECIOUS],[_AC_ARG_VAR_PRECIOUS])
+ 
+ AC_SUBST(CFLAGS)
+ 
+-# In order to override CFLAGS_FOR_TARGET, all of our special flags go
+-# in XCFLAGS.  But we need them in CFLAGS during configury.  So put them
+-# in both places for now and restore CFLAGS at the end of config.
+-save_CFLAGS="$CFLAGS"
+-
+ # Find other programs we need.
+ AC_CHECK_TOOL(AR, ar)
+ AC_CHECK_TOOL(NM, nm)
