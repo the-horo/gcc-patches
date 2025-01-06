@@ -1,0 +1,92 @@
+From 403c57a863a48014db8124cfe84cfbfd8001c084 Mon Sep 17 00:00:00 2001
+Message-ID: <403c57a863a48014db8124cfe84cfbfd8001c084.1736136592.git.sam@gentoo.org>
+From: Simon Martin <simon@nasilyan.com>
+Date: Sun, 5 Jan 2025 20:01:26 +0000
+Subject: [PATCH] c++: Clear TARGET_EXPR_ELIDING_P when forced to use a copy
+ constructor due to __no_unique_address__ [PR118199]
+
+We currently fail with a checking assert upon the following valid code
+when using -fno-elide-constructors
+
+=== cut here ===
+struct d { ~d(); };
+d &b();
+struct f {
+  [[__no_unique_address__]] d e;
+};
+struct h : f  {
+  h() : f{b()} {}
+} i;
+=== cut here ===
+
+The problem is that split_nonconstant_init_1 detects that it cannot
+elide the copy constructor due to __no_unique_address__ but does not
+clear TARGET_EXPR_ELIDING_P, and due to -fno-elide-constructors, we trip
+on a checking assert in cp_gimplify_expr.
+
+This patch fixes this by making sure that we clear TARGET_EXPR_ELIDING_P
+if we determine that we have to keep the copy constructor due to
+__no_unique_address__. An alternative would be to just check for
+elide_constructors in that assert, but I think it'd lose most of its
+value if we did so.
+
+Successfully tested on x86_64-pc-linux-gnu.
+
+	PR c++/118199
+
+gcc/cp/ChangeLog:
+
+	* typeck2.cc (split_nonconstant_init_1): Clear
+	TARGET_EXPR_ELIDING_P if we need to use a copy constructor
+	because of __no_unique_address__.
+
+gcc/testsuite/ChangeLog:
+
+* g++.dg/init/no-elide3.C: New test.
+---
+ gcc/cp/typeck2.cc                     |  5 +++++
+ gcc/testsuite/g++.dg/init/no-elide3.C | 12 ++++++++++++
+ 2 files changed, 17 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/init/no-elide3.C
+
+diff --git a/gcc/cp/typeck2.cc b/gcc/cp/typeck2.cc
+index 381f198d0fe6..f50c5f767bb8 100644
+--- a/gcc/cp/typeck2.cc
++++ b/gcc/cp/typeck2.cc
+@@ -655,6 +655,11 @@ split_nonconstant_init_1 (tree dest, tree init, bool last,
+ 			  && make_safe_copy_elision (sub, value))
+ 			goto build_init;
+ 
++		      if (TREE_CODE (value) == TARGET_EXPR)
++			/* We have to add this constructor, so we will not
++			   elide.  */
++			TARGET_EXPR_ELIDING_P (value) = false;
++
+ 		      tree name = (DECL_FIELD_IS_BASE (field_index)
+ 				   ? base_ctor_identifier
+ 				   : complete_ctor_identifier);
+diff --git a/gcc/testsuite/g++.dg/init/no-elide3.C b/gcc/testsuite/g++.dg/init/no-elide3.C
+new file mode 100644
+index 000000000000..659eb19bc95a
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/init/no-elide3.C
+@@ -0,0 +1,12 @@
++// PR c++/118199
++// { dg-do "compile" { target c++11 } }
++// { dg-options "-fno-elide-constructors" } 
++
++struct d { ~d(); };
++d &b();
++struct f {
++  [[__no_unique_address__]] d e;
++};
++struct h : f  {
++  h() : f{b()} {}
++} i;
+
+base-commit: 451ff5b58f7c5958f8341160343680262944a63f
+prerequisite-patch-id: cca034489e37f362f6ff4ff1aba0258270153a6a
+prerequisite-patch-id: dcb0315887787c40fae21980c53d20d0b6e234b7
+-- 
+2.47.1
+
