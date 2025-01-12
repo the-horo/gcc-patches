@@ -1,5 +1,6 @@
 37	????
 
+	- 77_all_PR118112-c-c-UX-improvements-to-too-few-many-arguments-errors.patch
 	- 78_all_PR118032-Revert-gimple-Add-limit-after-which-slower-switchlow.patch
 	- 79_all_PR32491-fix-binutils-arm-check.patch
 	+ 80_all_PR81358-Enable-automatic-linking-of-libatomic.patch
