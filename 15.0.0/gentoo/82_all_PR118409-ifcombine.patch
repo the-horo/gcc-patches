@@ -1,8 +1,10 @@
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=118409#c26
+https://inbox.sourceware.org/gcc-patches/ored17gz9x.fsf@lxoliva.fsfla.org/
 
-[ifcombine] propagate signbit mask to XOR right-hand operand
-
+From bfb791ad941348a0bb854b770f2294424528bc40 Mon Sep 17 00:00:00 2001
+Message-ID: <bfb791ad941348a0bb854b770f2294424528bc40.1736739564.git.sam@gentoo.org>
 From: Alexandre Oliva <oliva@adacore.com>
+Date: Mon, 13 Jan 2025 00:37:14 -0300
+Subject: [PATCH] propagate signbit mask to XOR right-hand operand
 
 If a single-bit bitfield takes up the sign bit of a storage unit,
 comparing the corresponding bitfield between two objects loads the
@@ -19,6 +21,7 @@ the right-hand operand when both were taken from the same XOR.
 
 This patch fixes that.
 
+Regstrapped on x86_64-linux-gnu.  Ok to install?
 
 for  gcc/ChangeLog
 
@@ -28,16 +31,16 @@ for  gcc/ChangeLog
 
 for  gcc/testsuite/ChangeLog
 
-	PR tree-optimization/118409
+PR tree-optimization/118409
 	* gcc.dg/field-merge-20.c: New.
 ---
- gcc/gimple-fold.cc                    |   20 ++++++++++
- gcc/testsuite/gcc.dg/field-merge-20.c |   64 +++++++++++++++++++++++++++++++++
+ gcc/gimple-fold.cc                    | 20 +++++++++
+ gcc/testsuite/gcc.dg/field-merge-20.c | 64 +++++++++++++++++++++++++++
  2 files changed, 84 insertions(+)
  create mode 100644 gcc/testsuite/gcc.dg/field-merge-20.c
 
 diff --git a/gcc/gimple-fold.cc b/gcc/gimple-fold.cc
-index a3987c4590ae6..93ed8b3abb056 100644
+index a3987c4590ae..93ed8b3abb05 100644
 --- a/gcc/gimple-fold.cc
 +++ b/gcc/gimple-fold.cc
 @@ -8270,6 +8270,16 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
@@ -76,7 +79,7 @@ index a3987c4590ae6..93ed8b3abb056 100644
    /* If either comparison code is not correct for our logical operation,
 diff --git a/gcc/testsuite/gcc.dg/field-merge-20.c b/gcc/testsuite/gcc.dg/field-merge-20.c
 new file mode 100644
-index 0000000000000..44ac7fae50dc5
+index 000000000000..44ac7fae50dc
 --- /dev/null
 +++ b/gcc/testsuite/gcc.dg/field-merge-20.c
 @@ -0,0 +1,64 @@
@@ -144,3 +147,8 @@ index 0000000000000..44ac7fae50dc5
 +    __builtin_abort();
 +  return 0;
 +}
+
+base-commit: 0e05b793fba2a9bea9f0fbb1f068679f5dadf514
+-- 
+2.48.0
+
