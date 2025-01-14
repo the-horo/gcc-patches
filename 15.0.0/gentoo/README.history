@@ -1,3 +1,7 @@
+40	14 January 2025
+
+	+ 86_all_PR118418-Fix-build-for-STORE_FLAG_VALUE-0-targets.patch
+
 39	14 January 2025
 
 	U 80_all_PR81358-Enable-automatic-linking-of-libatomic.patch

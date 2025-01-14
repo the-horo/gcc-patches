@@ -1,0 +1,87 @@
+From a1a14ce3c39c25fecf052ffde063fc0ecfc2ffa3 Mon Sep 17 00:00:00 2001
+Message-ID: <a1a14ce3c39c25fecf052ffde063fc0ecfc2ffa3.1736867096.git.sam@gentoo.org>
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Mon, 13 Jan 2025 19:37:12 +0000
+Subject: [PATCH] Fix build for STORE_FLAG_VALUE<0 targets [PR118418]
+
+In g:06c4cf398947b53b4bfc65752f9f879bb2d07924 I mishandled signed
+comparisons of comparison results on STORE_FLAG_VALUE < 0 targets
+(despite specifically referencing STORE_FLAG_VALUE in the commit
+message).  There, (lt TRUE FALSE) is true, although (ltu FALSE TRUE)
+still holds.
+
+Things get messy with vector modes, and since those weren't the focus
+of the original commit, it seemed better to punt on them for now.
+However, punting means that this optimisation no longer feels like
+a natural tail-call operation.  The patch therefore converts
+"return simplify..." to the usual call-and-conditional-return pattern.
+
+gcc/
+	PR target/118418
+	* simplify-rtx.cc (simplify_context::simplify_relational_operation_1):
+	Take STORE_FLAG_VALUE into account when handling signed comparisons
+	of comparison results.
+---
+ gcc/simplify-rtx.cc | 39 ++++++++++++++++++++++++---------------
+ 1 file changed, 24 insertions(+), 15 deletions(-)
+
+diff --git a/gcc/simplify-rtx.cc b/gcc/simplify-rtx.cc
+index 71c5d3c1b1b8..dda8fc689e79 100644
+--- a/gcc/simplify-rtx.cc
++++ b/gcc/simplify-rtx.cc
+@@ -6434,7 +6434,7 @@ simplify_context::simplify_relational_operation_1 (rtx_code code,
+ 	return simplify_gen_binary (AND, mode, XEXP (tmp, 0), const1_rtx);
+     }
+ 
+-  /* For two booleans A and B:
++  /* For two unsigned booleans A and B:
+ 
+      A >  B == ~B & A
+      A >= B == ~B | A
+@@ -6443,20 +6443,29 @@ simplify_context::simplify_relational_operation_1 (rtx_code code,
+      A == B == ~A ^ B (== ~B ^ A)
+      A != B ==  A ^ B
+ 
+-     simplify_logical_relational_operation checks whether A and B
+-     are booleans.  */
+-  if (code == GTU || code == GT)
+-    return simplify_logical_relational_operation (AND, mode, op1, op0, true);
+-  if (code == GEU || code == GE)
+-    return simplify_logical_relational_operation (IOR, mode, op1, op0, true);
+-  if (code == LTU || code == LT)
+-    return simplify_logical_relational_operation (AND, mode, op0, op1, true);
+-  if (code == LEU || code == LE)
+-    return simplify_logical_relational_operation (IOR, mode, op0, op1, true);
+-  if (code == EQ)
+-    return simplify_logical_relational_operation (XOR, mode, op0, op1, true);
+-  if (code == NE)
+-    return simplify_logical_relational_operation (XOR, mode, op0, op1);
++     For signed comparisons, we have to take STORE_FLAG_VALUE into account,
++     with the rules above applying for positive STORE_FLAG_VALUE and with
++     the relations reversed for negative STORE_FLAG_VALUE.  */
++  if (is_a<scalar_int_mode> (cmp_mode)
++      && COMPARISON_P (op0)
++      && COMPARISON_P (op1))
++    {
++      rtx t = NULL_RTX;
++      if (code == GTU || code == (STORE_FLAG_VALUE > 0 ? GT : LT))
++	t = simplify_logical_relational_operation (AND, mode, op1, op0, true);
++      else if (code == GEU || code == (STORE_FLAG_VALUE > 0 ? GE : LE))
++	t = simplify_logical_relational_operation (IOR, mode, op1, op0, true);
++      else if (code == LTU || code == (STORE_FLAG_VALUE > 0 ? LT : GT))
++	t = simplify_logical_relational_operation (AND, mode, op0, op1, true);
++      else if (code == LEU || code == (STORE_FLAG_VALUE > 0 ? LE : GE))
++	t = simplify_logical_relational_operation (IOR, mode, op0, op1, true);
++      else if (code == EQ)
++	t = simplify_logical_relational_operation (XOR, mode, op0, op1, true);
++      else if (code == NE)
++	t = simplify_logical_relational_operation (XOR, mode, op0, op1);
++      if (t)
++	return t;
++    }
+ 
+   return NULL_RTX;
+ }
+-- 
+2.48.0
+
