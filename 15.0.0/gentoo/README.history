@@ -1,6 +1,7 @@
 41	????
 
 	- 84_all_PR118456-check-and-extend-constants-to-compare-with-bitfields.patch
+	- 85_all_PR118456-robustify-decode_field_reference.patch
 	- 86_all_PR118418-Fix-build-for-STORE_FLAG_VALUE-0-targets.patch
 
 40	14 January 2025
