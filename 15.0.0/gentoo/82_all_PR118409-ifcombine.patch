@@ -1,0 +1,154 @@
+https://inbox.sourceware.org/gcc-patches/ored17gz9x.fsf@lxoliva.fsfla.org/
+
+From bfb791ad941348a0bb854b770f2294424528bc40 Mon Sep 17 00:00:00 2001
+Message-ID: <bfb791ad941348a0bb854b770f2294424528bc40.1736739564.git.sam@gentoo.org>
+From: Alexandre Oliva <oliva@adacore.com>
+Date: Mon, 13 Jan 2025 00:37:14 -0300
+Subject: [PATCH] propagate signbit mask to XOR right-hand operand
+
+If a single-bit bitfield takes up the sign bit of a storage unit,
+comparing the corresponding bitfield between two objects loads the
+storage units, XORs them, converts the result to signed char, and
+compares it with zero: ((signed char)(a.<byte> ^ c.<byte>) >= 0).
+
+fold_truth_andor_for_ifcombine recognizes the compare with zero as a
+sign bit test, then it decomposes the XOR into an equality test.
+
+The problem is that, after this decomposition, that figures out the
+width of the accessed fields, we apply the sign bit mask to the
+left-hand operand of the compare, but we failed to also apply it to
+the right-hand operand when both were taken from the same XOR.
+
+This patch fixes that.
+
+Regstrapped on x86_64-linux-gnu.  Ok to install?
+
+for  gcc/ChangeLog
+
+	PR tree-optimization/118409
+	* gimple-fold.cc (fold_truth_andor_for_ifcombine): Apply the
+	signbit mask to the right-hand XOR operand too.
+
+for  gcc/testsuite/ChangeLog
+
+PR tree-optimization/118409
+	* gcc.dg/field-merge-20.c: New.
+---
+ gcc/gimple-fold.cc                    | 20 +++++++++
+ gcc/testsuite/gcc.dg/field-merge-20.c | 64 +++++++++++++++++++++++++++
+ 2 files changed, 84 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/field-merge-20.c
+
+diff --git a/gcc/gimple-fold.cc b/gcc/gimple-fold.cc
+index a3987c4590ae..93ed8b3abb05 100644
+--- a/gcc/gimple-fold.cc
++++ b/gcc/gimple-fold.cc
+@@ -8270,6 +8270,16 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+ 	ll_and_mask = sign;
+       else
+ 	ll_and_mask &= sign;
++      if (l_xor)
++	{
++	  if (!lr_and_mask.get_precision ())
++	    lr_and_mask = sign;
++	  else
++	    lr_and_mask &= sign;
++	  if (l_const.get_precision ())
++	    l_const &= wide_int::from (lr_and_mask,
++				       l_const.get_precision (), UNSIGNED);
++	}
+     }
+ 
+   if (rsignbit)
+@@ -8279,6 +8289,16 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+ 	rl_and_mask = sign;
+       else
+ 	rl_and_mask &= sign;
++      if (r_xor)
++	{
++	  if (!rr_and_mask.get_precision ())
++	    rr_and_mask = sign;
++	  else
++	    rr_and_mask &= sign;
++	  if (r_const.get_precision ())
++	    r_const &= wide_int::from (rr_and_mask,
++				       r_const.get_precision (), UNSIGNED);
++	}
+     }
+ 
+   /* If either comparison code is not correct for our logical operation,
+diff --git a/gcc/testsuite/gcc.dg/field-merge-20.c b/gcc/testsuite/gcc.dg/field-merge-20.c
+new file mode 100644
+index 000000000000..44ac7fae50dc
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/field-merge-20.c
+@@ -0,0 +1,64 @@
++/* { dg-do run } */
++/* { dg-options "-O1" } */
++
++/* tree-optimization/118409 */
++
++/* Check that tests involving a sign bit of a storage unit are handled
++   correctly.  The compares are turned into xor tests by earlier passes, and
++   ifcombine has to propagate the sign bit mask to the right hand of the
++   compare extracted from the xor, otherwise we'll retain unwanted bits for the
++   compare.  */
++
++typedef struct {
++    int p : __CHAR_BIT__;
++    int d : 1;
++    int b : __CHAR_BIT__ - 2;
++    int e : 1;
++} g;
++
++g a = {.d = 1, .e = 1}, c = {.b = 1, .d = 1, .e = 1};
++
++__attribute__((noipa))
++int f1 ()
++{
++  if (a.d == c.d
++      && a.e == c.e)
++    return 0;
++  return -1;
++}
++
++__attribute__((noipa))
++int f2 ()
++{
++  if (a.d != c.d
++      || a.e != c.e)
++    return -1;
++  return 0;
++}
++
++__attribute__((noipa))
++int f3 ()
++{
++  if (c.d == a.d
++      && c.e == a.e)
++    return 0;
++  return -1;
++}
++
++__attribute__((noipa))
++int f4 ()
++{
++  if (c.d != a.d
++      || c.e != a.e)
++    return -1;
++  return 0;
++}
++
++int main() {
++  if (f1 () < 0
++      || f2 () < 0
++      || f3 () < 0
++      || f4 () < 0)
++    __builtin_abort();
++  return 0;
++}
+
+base-commit: 0e05b793fba2a9bea9f0fbb1f068679f5dadf514
+-- 
+2.48.0
+
