@@ -1,0 +1,271 @@
+From 70951aa9a0c324893d957da614fcc8c749571a52 Mon Sep 17 00:00:00 2001
+Message-ID: <70951aa9a0c324893d957da614fcc8c749571a52.1738971381.git.sam@gentoo.org>
+From: Martin Jambor <mjambor@suse.cz>
+Date: Wed, 22 Jan 2025 17:44:48 +0100
+Subject: [PATCH] ipa-cp: Perform operations in the appropriate types (PR
+ 118097)
+
+Hi,
+
+one of the testcases from PR 118097 and the one from PR 118535 show
+that the fix to PR 118138 was incomplete.  We must not only make sure
+that (intermediate) results of operations performed by IPA-CP are
+fold_converted to the type of the destination formal parameter but we
+also must decouple the these types from the ones in which operations
+are performed.
+
+This patch does that, even though we do not store or stream the
+operation types, instead we simply limit ourselves to tcc_comparisons
+and operations for which the first operand and the result are of the
+same type as determined by expr_type_first_operand_type_p.  If we
+wanted to go beyond these, we would indeed need to store/stream the
+respective operation type.
+
+ipa_value_from_jfunc needs an additional check that res_type is not
+NULL because it is not called just from within IPA-CP (where we know
+we have a destination lattice slot belonging to a defined parameter)
+but also from inlining, ipa-fnsummary and ipa-modref where it is used
+to examine a call to a function with variadic arguments and we do not
+have types for the unknown parameters.  But we cannot really work with
+those or estimate any benefits when it comes to them, so ignoring them
+should be OK.
+
+Even after this patch, ipa_get_jf_arith_result has a parameter called
+res_type in which it performs operations for aggregate jump functions,
+where we do not allow type conversions when constucting the jump
+functions and the type is the type of the stored data.  In GCC 16, we
+could relax this and allow conversions like for scalars.
+
+Bootstrapped, LTO-bootstrapped and tested on x86_64-linux.  OK for
+master?
+
+Thanks,
+
+Honza
+
+gcc/ChangeLog:
+
+2025-01-20  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/118097
+	* ipa-cp.cc (ipa_get_jf_arith_result): Adjust comment.
+	(ipa_get_jf_pass_through_result): Removed.
+	(ipa_value_from_jfunc): Use directly ipa_get_jf_arith_result, do
+	not specify operation type but make sure we check and possibly
+	convert the result.
+	(get_val_across_arith_op): Remove the last parameter, always pass
+	NULL_TREE to ipa_get_jf_arith_result in its last argument.
+	(propagate_vals_across_arith_jfunc): Do not pass res_type to
+	get_val_across_arith_op.
+	(propagate_vals_across_pass_through): Add checking assert that
+	parm_type is not NULL.
+
+gcc/testsuite/ChangeLog:
+
+2025-01-20  Martin Jambor  <mjambor@suse.cz>
+
+PR ipa/118097
+	* gcc.dg/ipa/pr118097.c: New test.
+	* gcc.dg/ipa/pr118535.c: Likewise.
+	* gcc.dg/ipa/ipa-notypes-1.c: Likewise.
+---
+ gcc/ipa-cp.cc                            | 46 ++++++++++--------------
+ gcc/testsuite/gcc.dg/ipa/ipa-notypes-1.c | 17 +++++++++
+ gcc/testsuite/gcc.dg/ipa/pr118097.c      | 23 ++++++++++++
+ gcc/testsuite/gcc.dg/ipa/pr118535.c      | 17 +++++++++
+ 4 files changed, 75 insertions(+), 28 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/ipa/ipa-notypes-1.c
+ create mode 100644 gcc/testsuite/gcc.dg/ipa/pr118097.c
+ create mode 100644 gcc/testsuite/gcc.dg/ipa/pr118535.c
+
+diff --git a/gcc/ipa-cp.cc b/gcc/ipa-cp.cc
+index d89324a00775..68959f2677ba 100644
+--- a/gcc/ipa-cp.cc
++++ b/gcc/ipa-cp.cc
+@@ -1467,11 +1467,10 @@ ipacp_value_safe_for_type (tree param_type, tree value)
+     return NULL_TREE;
+ }
+ 
+-/* Return the result of a (possibly arithmetic) operation on the constant
+-   value INPUT.  OPERAND is 2nd operand for binary operation.  RES_TYPE is
+-   the type of the parameter to which the result is passed.  Return
+-   NULL_TREE if that cannot be determined or be considered an
+-   interprocedural invariant.  */
++/* Return the result of a (possibly arithmetic) operation on the constant value
++   INPUT.  OPERAND is 2nd operand for binary operation.  RES_TYPE is the type
++   in which any operation is to be performed.  Return NULL_TREE if that cannot
++   be determined or be considered an interprocedural invariant.  */
+ 
+ static tree
+ ipa_get_jf_arith_result (enum tree_code opcode, tree input, tree operand,
+@@ -1513,21 +1512,6 @@ ipa_get_jf_arith_result (enum tree_code opcode, tree input, tree operand,
+   return res;
+ }
+ 
+-/* Return the result of a (possibly arithmetic) pass through jump function
+-   JFUNC on the constant value INPUT.  RES_TYPE is the type of the parameter
+-   to which the result is passed.  Return NULL_TREE if that cannot be
+-   determined or be considered an interprocedural invariant.  */
+-
+-static tree
+-ipa_get_jf_pass_through_result (struct ipa_jump_func *jfunc, tree input,
+-				tree res_type)
+-{
+-  return ipa_get_jf_arith_result (ipa_get_jf_pass_through_operation (jfunc),
+-				  input,
+-				  ipa_get_jf_pass_through_operand (jfunc),
+-				  res_type);
+-}
+-
+ /* Return the result of an ancestor jump function JFUNC on the constant value
+    INPUT.  Return NULL_TREE if that cannot be determined.  */
+ 
+@@ -1595,7 +1579,14 @@ ipa_value_from_jfunc (class ipa_node_params *info, struct ipa_jump_func *jfunc,
+ 	return NULL_TREE;
+ 
+       if (jfunc->type == IPA_JF_PASS_THROUGH)
+-	return ipa_get_jf_pass_through_result (jfunc, input, parm_type);
++	{
++	  if (!parm_type)
++	    return NULL_TREE;
++	  enum tree_code opcode = ipa_get_jf_pass_through_operation (jfunc);
++	  tree op2 = ipa_get_jf_pass_through_operand (jfunc);
++	  tree cstval = ipa_get_jf_arith_result (opcode, input, op2, NULL_TREE);
++	  return ipacp_value_safe_for_type (parm_type, cstval);
++	}
+       else
+ 	return ipa_get_jf_ancestor_result (jfunc, input);
+     }
+@@ -2120,15 +2111,13 @@ ipcp_lattice<valtype>::add_value (valtype newval, cgraph_edge *cs,
+ /* A helper function that returns result of operation specified by OPCODE on
+    the value of SRC_VAL.  If non-NULL, OPND1_TYPE is expected type for the
+    value of SRC_VAL.  If the operation is binary, OPND2 is a constant value
+-   acting as its second operand.  If non-NULL, RES_TYPE is expected type of
+-   the result.  */
++   acting as its second operand.  */
+ 
+ static tree
+ get_val_across_arith_op (enum tree_code opcode,
+ 			 tree opnd1_type,
+ 			 tree opnd2,
+-			 ipcp_value<tree> *src_val,
+-			 tree res_type)
++			 ipcp_value<tree> *src_val)
+ {
+   tree opnd1 = src_val->value;
+ 
+@@ -2137,7 +2126,7 @@ get_val_across_arith_op (enum tree_code opcode,
+       && !useless_type_conversion_p (opnd1_type, TREE_TYPE (opnd1)))
+     return NULL_TREE;
+ 
+-  return ipa_get_jf_arith_result (opcode, opnd1, opnd2, res_type);
++  return ipa_get_jf_arith_result (opcode, opnd1, opnd2, NULL_TREE);
+ }
+ 
+ /* Propagate values through an arithmetic transformation described by a jump
+@@ -2213,7 +2202,7 @@ propagate_vals_across_arith_jfunc (cgraph_edge *cs,
+ 	  for (int j = 1; j < max_recursive_depth; j++)
+ 	    {
+ 	      tree cstval = get_val_across_arith_op (opcode, opnd1_type, opnd2,
+-						     src_val, res_type);
++						     src_val);
+ 	      cstval = ipacp_value_safe_for_type (res_type, cstval);
+ 	      if (!cstval)
+ 		break;
+@@ -2238,7 +2227,7 @@ propagate_vals_across_arith_jfunc (cgraph_edge *cs,
+ 	  }
+ 
+ 	tree cstval = get_val_across_arith_op (opcode, opnd1_type, opnd2,
+-					       src_val, res_type);
++					       src_val);
+ 	cstval = ipacp_value_safe_for_type (res_type, cstval);
+ 	if (cstval)
+ 	  ret |= dest_lat->add_value (cstval, cs, src_val, src_idx,
+@@ -2261,6 +2250,7 @@ propagate_vals_across_pass_through (cgraph_edge *cs, ipa_jump_func *jfunc,
+ 				    ipcp_lattice<tree> *dest_lat, int src_idx,
+ 				    tree parm_type)
+ {
++  gcc_checking_assert (parm_type);
+   return propagate_vals_across_arith_jfunc (cs,
+ 				ipa_get_jf_pass_through_operation (jfunc),
+ 				NULL_TREE,
+diff --git a/gcc/testsuite/gcc.dg/ipa/ipa-notypes-1.c b/gcc/testsuite/gcc.dg/ipa/ipa-notypes-1.c
+new file mode 100644
+index 000000000000..e8f4adaed171
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/ipa/ipa-notypes-1.c
+@@ -0,0 +1,17 @@
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++
++void some_memcpy(void *, long);
++long bufused;
++char buf, otest_s;
++void otest(...) {
++  long slength;
++  some_memcpy(&buf + bufused, slength & otest_s);
++}
++int f, finish_root_table_fli2_1;
++static void finish_root_table(char *lastname) {
++  for (;;)
++    if (finish_root_table_fli2_1)
++      otest(f, lastname);
++}
++void write_roots() { finish_root_table(""); }
+diff --git a/gcc/testsuite/gcc.dg/ipa/pr118097.c b/gcc/testsuite/gcc.dg/ipa/pr118097.c
+new file mode 100644
+index 000000000000..772e83f3bf49
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/ipa/pr118097.c
+@@ -0,0 +1,23 @@
++/* { dg-do run } */
++/* { dg-options "-O2 -fno-inline" } */
++
++int a, b, c, *d = &a;
++long e;
++static long am (long f, int g) {
++  return g == 0 || f == 1 && g == 1 ?: f / g;
++}
++static void aq (unsigned f)
++{
++  c ^= e = am(~f, 1);
++  b = 7 - (e >= 1) - 33;
++  *d = b;
++}
++
++int main() {
++  //  am(1, 1);
++  aq(1);
++  if (a == 0xffffffffffffffe5)
++    ;
++  else
++    __builtin_abort();
++}
+diff --git a/gcc/testsuite/gcc.dg/ipa/pr118535.c b/gcc/testsuite/gcc.dg/ipa/pr118535.c
+new file mode 100644
+index 000000000000..960ba4a5db2a
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/ipa/pr118535.c
+@@ -0,0 +1,17 @@
++/* { dg-do run } */
++/* { dg-options "-O2" } */
++
++int a, b, c, d, e, f, *g = &b;
++static int h(int i) { return i < 0 || i > a ? 0 : i << a; }
++static int j(unsigned short i) {
++  f = d == e;
++  *g = h(65535 ^ i);
++  return c;
++}
++int main() {
++  j(0);
++  h(0);
++  if (b != 0)
++    __builtin_abort();
++  return 0;
++}
+
+base-commit: 7d8e8f89732b1f13752e1b370852c7bcbbbde259
+-- 
+2.48.1
+
