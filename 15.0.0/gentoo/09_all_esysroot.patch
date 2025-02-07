@@ -12,6 +12,8 @@ The CHOST check is necessary for a Canadian Cross. In that case, two
 cross-compilers are invoked, but only the one matching CHOST should have
 its sysroot set by ESYSROOT.
 
+Bug: https://bugs.gentoo.org/942672
+Closes: https://github.com/gentoo/gcc-patches/pull/7
 Signed-off-by: James Le Cuirot <chewi@gentoo.org>
 ---
  gcc/doc/invoke.texi | 11 +++++++++++
