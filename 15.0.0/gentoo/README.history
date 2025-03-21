@@ -2,6 +2,7 @@
 
 	+ 77_all_PR119376-Disable-clang-musttail.patch
 	+ 78_all_PR118615.patch
+	+ 79_all_PR117811-arm-neon-shift.patch
 
 47	16 March 2025
 
