@@ -1,3 +1,21 @@
+2025-03-21  Surya Kumari Jangala  <jskumari@linux.ibm.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/116028
+	PR rtl-optimization/118615
+	* lra-constraints.cc (first_call_insn): New variable.
+	(split_reg): Spill register before first_call_insn if call_save_p
+	and the call is in a different bb in the ebb.
+	(split_if_necessary): Formatting fix.
+	(inherit_in_ebb): Set first_call_insn when handling a CALL_INSN.
+	For successful split_if_necessary with before_p, only change
+	use_insn if it emitted any new instructions before curr_insn.
+	Clear first_call_insn before returning.
+	
+	* gcc.dg/ira-shrinkwrap-prep-1.c: Remove xfail for powerpc.
+	* gcc.dg/pr10474.c: Remove xfail for powerpc and arm.
+	* gcc.dg/pr118615.c: New test.
+
 --- a/gcc/lra-constraints.cc	2025-03-19 19:20:41.644440691 +0100
 +++ b/gcc/lra-constraints.cc	2025-03-20 18:40:04.188299643 +0100
 @@ -152,6 +152,9 @@ static machine_mode curr_operand_mode[MA
@@ -52,14 +70,6 @@
    return res;
  }
  
-@@ -6862,6 +6879,7 @@ inherit_in_ebb (rtx_insn *head, rtx_insn
-   last_processed_bb = NULL;
-   CLEAR_HARD_REG_SET (potential_reload_hard_regs);
-   live_hard_regs = eliminable_regset | lra_no_alloc_regs;
-+  first_call_insn = NULL;
-   /* We don't process new insns generated in the loop.	*/
-   for (curr_insn = tail; curr_insn != PREV_INSN (head); curr_insn = prev_insn)
-     {
 @@ -7074,6 +7092,7 @@ inherit_in_ebb (rtx_insn *head, rtx_insn
  	      last_call_for_abi[callee_abi.id ()] = calls_num;
  	      full_and_partial_call_clobbers
@@ -102,10 +112,38 @@
 -/* { dg-final { scan-rtl-dump "Performing shrink-wrapping" "pro_and_epilogue" { xfail powerpc*-*-* } } } */
 +/* { dg-final { scan-rtl-dump "Performing shrink-wrapping" "pro_and_epilogue" } } */
 --- a/gcc/testsuite/gcc.dg/pr10474.c	2025-03-20 19:50:49.379486857 +0100
-+++ b/gcc/testsuite/gcc.dg/pr10474.c	2025-03-20 19:51:30.150929050 +0100
-@@ -13,4 +13,4 @@ void f(int *i)
++++ b/gcc/testsuite/gcc.dg/pr10474.c	2025-03-21 09:33:23.808051052 +0100
+@@ -12,5 +12,4 @@ void f(int *i)
+ 	}
  }
  
- /* XFAIL due to PR70681.  */ 
+-/* XFAIL due to PR70681.  */ 
 -/* { dg-final { scan-rtl-dump "Performing shrink-wrapping" "pro_and_epilogue"  { xfail arm*-*-* powerpc*-*-* } } } */
-+/* { dg-final { scan-rtl-dump "Performing shrink-wrapping" "pro_and_epilogue"  { xfail arm*-*-* } } } */
++/* { dg-final { scan-rtl-dump "Performing shrink-wrapping" "pro_and_epilogue" } } */
+--- a/gcc/testsuite/gcc.dg/pr118615.c	2025-03-21 09:44:26.502876412 +0100
++++ b/gcc/testsuite/gcc.dg/pr118615.c	2025-03-21 09:45:22.447104189 +0100
+@@ -0,0 +1,24 @@
++/* PR rtl-optimization/118615 */
++/* { dg-do compile { target scheduling } } */
++/* { dg-options "-O2 -fcompare-debug -fschedule-insns" } */
++
++void foo (void);
++void bar (int);
++void baz (int *);
++int j;
++
++void
++qux (int k, int *m)
++{
++  int n;
++  if (k)
++    {
++      foo ();
++      if (m)
++	{
++	  bar (j);
++	  baz (m);
++	}
++    }
++  baz (&n);
++}
