@@ -1,3 +1,94 @@
+https://inbox.sourceware.org/gcc-patches/Z91i4oSOe2t9Wsu5@tucnak/
+
+Date: Fri, 21 Mar 2025 14:00:18 +0100
+From: Jakub Jelinek <jakub@redhat.com>
+To: Vladimir Makarov <vmakarov@redhat.com>, Jeff Law <jeffreyalaw@gmail.com>,
+        Richard Sandiford <richard.sandiford@arm.com>
+Cc: gcc-patches@gcc.gnu.org, Surya Kumari Jangala <jskumari@linux.ibm.com>,
+        Peter Bergner <bergner@linux.ibm.com>
+Subject: [PATCH] lra, v2: emit caller-save register spills before call insn
+ [PR116028]
+Message-ID: <Z91i4oSOe2t9Wsu5@tucnak>
+Reply-To: Jakub Jelinek <jakub@redhat.com>
+MIME-Version: 1.0
+X-Scanned-By: MIMEDefang 3.0 on 10.30.177.12
+X-Mimecast-Spam-Score: 0
+X-Mimecast-MFC-PROC-ID: _tXP__7Gkm9pvYzp53m4LpOJ23nLH9dr5dUlzvuS5ts_1742562026
+X-Mimecast-Originator: redhat.com
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+X-Spam-Status: No, score=-13.6 required=5.0 tests=BAYES_00,DKIM_INVALID,DKIM_SIGNED,KAM_DMARC_QUARANTINE,KAM_DMARC_STATUS,KAM_SHORT,RCVD_IN_DNSWL_NONE,RCVD_IN_HOSTKARMA_W,RCVD_IN_MSPIKE_H5,RCVD_IN_MSPIKE_WL,SPF_HELO_NONE,SPF_NONE,TXREP autolearn=no autolearn_force=no version=3.4.6
+X-Spam-Checker-Version: SpamAssassin 3.4.6 (2021-04-09) on server2.sourceware.org
+List-Id: <gcc-patches.gcc.gnu.org>
+
+Hi!
+
+Here is an updated version of Surya's PR116028 fix from August, which got
+reverted because it caused bootstrap failures on aarch64, later on bootstrap
+comparison errors there as well and problems on other targets as well.
+
+The changes compared to the
+https://gcc.gnu.org/pipermail/gcc-patches/2024-August/658973.html
+version are:
+1) the reason for aarch64 miscompilations and later on bootstrap comparison
+   issues as can be seen on the pr118615.c testcase in the patch was that
+   when curr_insn is a JUMP_INSN or some cases of CALL_INSNs,
+   split_if_necessary is called with before_p true and if it is successful,
+   the code set use_insn = PREV_INSN (curr_insn); instead of use_insn =
+   curr_insn; and that use_insn is then what is passed to
+   add_next_usage_insn; now, if the patch decides to emit the save
+   instruction(s) before the first call after curr_insn in the ebb rather
+   than before the JUMP_INSN/CALL_INSN, PREV_INSN (curr_insn) is some random
+   insn before it, not anything related to the split_reg actions.
+   If it is e.g. a DEBUG_INSN in one case vs. some unrelated other insn
+   otherwise, that can affect further split_reg within the same function
+2) as suggested by Surya in PR118615, it makes no sense to try to change
+   behavior if the first call after curr_insn is in the same bb as curr_insn
+3) split_reg is actually called sometimes from within inherit_in_ebb but
+   sometimes from elsewhere; trying to use whatever last call to
+   inherit_in_ebb saw last is a sure way to run into wrong-code issues,
+   so instead of clearing the rtx var at the start of inherit_in_ebb it is
+   now cleared at the end of it
+4) calling the var latest_call_insn was weird, inherit_in_ebb walks the ebb
+   backwards, so what the var contains is the first call insn within the
+   ebb (after curr_insn)
+5) the patch was using
+   lra_process_new_insns (PREV_INSN (latest_call_insn), NULL, save,
+                          "Add save<-reg");
+   to emit the save insn before latest_call_insn.  That feels quite weird
+   given that latest_call_insn has explicit support for adding stuff
+   before some insn or after some insn, adding something before some
+   insn doesn't really need to be done as addition after PREV_INSN
+6) some formatting nits + new testcase + removal of xfail even on arm32
+
+Bootstrapped/regtested on x86_64-linux/i686-linux (my usual
+--enable-checking=yes,rtl,extra builds), aarch64-linux (normal default
+bootstrap) and our distro scratch build
+({x86_64,i686,aarch64,powerpc64le,s390x}-linux --enable-checking=release
+LTO profiledbootstrap/regtest), I think Sam James tested on 32-bit arm
+too.
+On aarch64-linux this results in
+-FAIL: gcc.dg/pr10474.c scan-rtl-dump pro_and_epilogue "Performing shrink-wrapping"
+
+I admit I don't know the code well nor understood everything it is doing.
+
+I have some concerns:
+1) I wonder if there is a guarantee that first_call_insn if non-NULL will be
+   always in between curr_insn and usage_insn when call_save_p; I'd hope
+   yes because if usage_insn is before first_call_insn in the ebb,
+   presumably it wouldn't need to find call save regs because the range
+   wouldn't cross any calls
+2) I wonder whether it wouldn't be better instead of inserting the saves
+   before first_call_insn insert it at the start of the bb containing that
+   call (after labels of course); emitting it right before a call could
+   mislead code looking for argument slot initialization of the call
+3) even when avoiding the use_insn = PREV_INSN (curr_insn);, I wonder
+   if it is ok to use use_insn equal to curr_insn rather than the insns
+   far later where we actually inserted it, but primarily because I don't
+   understand the code much; I think for the !before_p case it is doing
+   similar thing  on a shorter distance, the saves were emitted after
+   curr_insn and we record it on curr_insn
+
 2025-03-21  Surya Kumari Jangala  <jskumari@linux.ibm.com>
 	    Jakub Jelinek  <jakub@redhat.com>
 
@@ -26,7 +117,7 @@
 +   or NULL outside of that function.  */
 +static rtx_insn *first_call_insn;
  
- 
+ 
  
 @@ -6373,12 +6376,26 @@ split_reg (bool before_p, int original_r
    lra_process_new_insns (as_a <rtx_insn *> (usage_insn),
@@ -147,3 +238,7 @@
 +    }
 +  baz (&n);
 +}
+
+	Jakub
+
+
