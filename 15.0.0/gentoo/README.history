@@ -1,5 +1,6 @@
 49	????
 
+	- 79_all_PR117811-arm-neon-shift.patch
 	+ 80_all_PR119428.patch
 
 48	24 March 2025
