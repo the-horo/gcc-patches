@@ -1,0 +1,56 @@
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119428#c10
+
+2025-03-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/96226
+	PR target/119428
+	* config/i386/i386.md (splitter after *<rotate_insn><mode>3_mask,
+	splitter after *<rotate_insn><mode>3_mask_1): Revert 2020-12-05
+	changes.
+
+	* gcc.c-torture/execute/pr119428.c: New test.
+
+--- a/gcc/config/i386/i386.md	2025-03-24 11:29:12.271793423 +0100
++++ b/gcc/config/i386/i386.md	2025-03-24 11:32:14.139305881 +0100
+@@ -18168,7 +18168,8 @@ (define_split
+  [(set (match_dup 4) (match_dup 1))
+   (set (match_dup 0)
+        (any_rotate:SWI (match_dup 4)
+-		       (subreg:QI (match_dup 2) 0)))]
++		       (subreg:QI
++			 (and:SI (match_dup 2) (match_dup 3)) 0)))]
+  "operands[4] = gen_reg_rtx (<MODE>mode);")
+ 
+ (define_insn_and_split "*<insn><mode>3_mask_1"
+@@ -18202,7 +18203,8 @@ (define_split
+   == GET_MODE_BITSIZE (<MODE>mode) - 1"
+  [(set (match_dup 4) (match_dup 1))
+   (set (match_dup 0)
+-       (any_rotate:SWI (match_dup 4) (match_dup 2)))]
++       (any_rotate:SWI (match_dup 4)
++		       (and:QI (match_dup 2) (match_dup 3))))]
+  "operands[4] = gen_reg_rtx (<MODE>mode);")
+ 
+ (define_insn_and_split "*<insn><mode>3_add"
+--- a/gcc/testsuite/gcc.c-torture/execute/pr119428.c	2025-03-24 11:41:31.583658619 +0100
++++ b/gcc/testsuite/gcc.c-torture/execute/pr119428.c	2025-03-24 11:40:37.884395211 +0100
+@@ -0,0 +1,18 @@
++/* PR target/119428 */
++
++__attribute__((noipa)) void
++foo (unsigned int x, unsigned char *y)
++{
++  y += x >> 3;
++  *y &= (unsigned char) ~(1 << (x & 0x07));
++}
++
++int
++main ()
++{
++  unsigned char buf[8];
++  __builtin_memset (buf, 0xff, 8);
++  foo (8, buf);
++  if (buf[1] != 0xfe)
++    __builtin_abort ();
++}
+
