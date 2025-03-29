@@ -1,0 +1,196 @@
+https://inbox.sourceware.org/gcc-patches/Z+aDTloxATzkpTbQ@tucnak/
+
+From 8db4ff073981a554ab5b77f958fa4a333b981b30 Mon Sep 17 00:00:00 2001
+Message-ID: <8db4ff073981a554ab5b77f958fa4a333b981b30.1743258660.git.sam@gentoo.org>
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 28 Mar 2025 12:09:02 +0100
+Subject: [PATCH 1/2] combine: Use reg_used_between_p rather than
+ modified_between_p in two spots [PR119291]
+
+Hi!
+
+The following testcase is miscompiled on x86_64-linux at -O2 by the combiner.
+We have from earlier combinations
+(insn 22 21 23 4 (set (reg:SI 104 [ _7 ])
+        (const_int 0 [0])) "pr119291.c":25:15 96 {*movsi_internal}
+     (nil))
+(insn 23 22 24 4 (set (reg/v:SI 117 [ e ])
+        (reg/v:SI 116 [ e ])) 96 {*movsi_internal}
+     (expr_list:REG_DEAD (reg/v:SI 116 [ e ])
+        (nil)))
+(note 24 23 25 4 NOTE_INSN_DELETED)
+(insn 25 24 26 4 (parallel [
+            (set (reg:CCZ 17 flags)
+                (compare:CCZ (neg:SI (reg:SI 104 [ _7 ]))
+                    (const_int 0 [0])))
+            (set (reg/v:SI 116 [ e ])
+                (neg:SI (reg:SI 104 [ _7 ])))
+        ]) "pr119291.c":26:13 977 {*negsi_2}
+     (expr_list:REG_DEAD (reg:SI 104 [ _7 ])
+        (nil)))
+(note 26 25 27 4 NOTE_INSN_DELETED)
+(insn 27 26 28 4 (set (reg:DI 128 [ _9 ])
+        (ne:DI (reg:CCZ 17 flags)
+            (const_int 0 [0]))) "pr119291.c":26:13 1447 {*setcc_di_1}
+     (expr_list:REG_DEAD (reg:CCZ 17 flags)
+        (nil)))
+and try_combine is called on i3 25 and i2 22 (second time)
+and reach the hunk being patched with simplified i3
+(insn 25 24 26 4 (parallel [
+            (set (pc)
+                (pc))
+            (set (reg/v:SI 116 [ e ])
+                (const_int 0 [0]))
+        ]) "pr119291.c":28:13 977 {*negsi_2}
+     (expr_list:REG_DEAD (reg:SI 104 [ _7 ])
+        (nil)))
+and
+(insn 22 21 23 4 (set (reg:SI 104 [ _7 ])
+        (const_int 0 [0])) "pr119291.c":27:15 96 {*movsi_internal}
+     (nil))
+Now, the try_combine code there attempts to split two independent
+sets in newpat by moving one of them to i2.
+And among other tests it checks
+!modified_between_p (SET_DEST (set1), i2, i3)
+which is certainly needed, if there would be say
+(set (reg/v:SI 116 [ e ]) (const_int 42 [0x2a]))
+in between i2 and i3, we couldn't do that, as that set would overwrite
+the value set by set1 we want to move to the i2 position.
+But in this case pseudo 116 isn't set in between i2 and i3, but used
+(and additionally there is a REG_DEAD note for it).
+
+This is equally bad for the move, because while the i3 insn
+and later will see the pseudo value that we set, the insn in between
+which uses the value will see a different value from the one that
+it should see.
+
+As we don't check for that, in the end try_combine succeeds and
+changes the IL to:
+(insn 22 21 23 4 (set (reg/v:SI 116 [ e ])
+        (const_int 0 [0])) "pr119291.c":27:15 96 {*movsi_internal}
+     (nil))
+(insn 23 22 24 4 (set (reg/v:SI 117 [ e ])
+        (reg/v:SI 116 [ e ])) 96 {*movsi_internal}
+     (expr_list:REG_DEAD (reg/v:SI 116 [ e ])
+        (nil)))
+(note 24 23 25 4 NOTE_INSN_DELETED)
+(insn 25 24 26 4 (set (pc)
+        (pc)) "pr119291.c":28:13 2147483647 {NOOP_MOVE}
+     (nil))
+(note 26 25 27 4 NOTE_INSN_DELETED)
+(insn 27 26 28 4 (set (reg:DI 128 [ _9 ])
+        (const_int 0 [0])) "pr119291.c":28:13 95 {*movdi_internal}
+     (nil))
+(note, the i3 got turned into a nop and try_combine also modified insn 27).
+
+The following patch replaces the modified_between_p
+tests with reg_used_between_p, my understanding is that
+modified_between_p is a subset of reg_used_between_p, so one
+doesn't need both.
+
+Bootstrapped/regtested on x86_64-linux, i686-linux, aarch64-linux,
+powerpc64le-linux and s390x-linux, ok for trunk?
+
+Looking at this some more today, I think we should special case
+set_noop_p because that can be put into i2 (except for the JUMP_P
+violations), currently both modified_between_p (pc_rtx, i2, i3)
+and reg_used_between_p (pc_rtx, i2, i3) returns false.
+I'll post a patch incrementally for that (but that feels like
+new optimization, so probably not something that should be backported).
+
+2025-03-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/119291
+	* combine.cc (try_combine): For splitting of PARALLEL with
+	2 independent SETs into i2 and i3 sets check reg_used_between_p
+	of the SET_DESTs rather than just modified_between_p.
+
+	* gcc.c-torture/execute/pr119291.c: New test.
+---
+ gcc/combine.cc                                | 14 ++++----
+ .../gcc.c-torture/execute/pr119291.c          | 33 +++++++++++++++++++
+ 2 files changed, 40 insertions(+), 7 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.c-torture/execute/pr119291.c
+
+diff --git a/gcc/combine.cc b/gcc/combine.cc
+index ef13f5d5e900..e87a9f272f1a 100644
+--- a/gcc/combine.cc
++++ b/gcc/combine.cc
+@@ -4012,18 +4012,18 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
+       rtx set1 = XVECEXP (newpat, 0, 1);
+ 
+       /* Normally, it doesn't matter which of the two is done first, but
+-	 one which uses any regs/memory set in between i2 and i3 can't
+-	 be first.  The PARALLEL might also have been pre-existing in i3,
+-	 so we need to make sure that we won't wrongly hoist a SET to i2
+-	 that would conflict with a death note present in there, or would
+-	 have its dest modified between i2 and i3.  */
++	 one which uses any regs/memory set or used in between i2 and i3
++	 can't be first.  The PARALLEL might also have been pre-existing
++	 in i3, so we need to make sure that we won't wrongly hoist a SET
++	 to i2 that would conflict with a death note present in there, or
++	 would have its dest modified or used between i2 and i3.  */
+       if (!modified_between_p (SET_SRC (set1), i2, i3)
+ 	  && !(REG_P (SET_DEST (set1))
+ 	       && find_reg_note (i2, REG_DEAD, SET_DEST (set1)))
+ 	  && !(GET_CODE (SET_DEST (set1)) == SUBREG
+ 	       && find_reg_note (i2, REG_DEAD,
+ 				 SUBREG_REG (SET_DEST (set1))))
+-	  && !modified_between_p (SET_DEST (set1), i2, i3)
++	  && !reg_used_between_p (SET_DEST (set1), i2, i3)
+ 	  /* If I3 is a jump, ensure that set0 is a jump so that
+ 	     we do not create invalid RTL.  */
+ 	  && (!JUMP_P (i3) || SET_DEST (set0) == pc_rtx)
+@@ -4038,7 +4038,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
+ 	       && !(GET_CODE (SET_DEST (set0)) == SUBREG
+ 		    && find_reg_note (i2, REG_DEAD,
+ 				      SUBREG_REG (SET_DEST (set0))))
+-	       && !modified_between_p (SET_DEST (set0), i2, i3)
++	       && !reg_used_between_p (SET_DEST (set0), i2, i3)
+ 	       /* If I3 is a jump, ensure that set1 is a jump so that
+ 		  we do not create invalid RTL.  */
+ 	       && (!JUMP_P (i3) || SET_DEST (set1) == pc_rtx)
+diff --git a/gcc/testsuite/gcc.c-torture/execute/pr119291.c b/gcc/testsuite/gcc.c-torture/execute/pr119291.c
+new file mode 100644
+index 000000000000..41eadf013d7d
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/execute/pr119291.c
+@@ -0,0 +1,33 @@
++/* PR rtl-optimization/119291 */
++
++int a;
++long c;
++
++__attribute__((noipa)) void
++foo (int x)
++{
++  if (x != 0)
++    __builtin_abort ();
++  a = 42;
++}
++
++int
++main ()
++{
++  int e = 1;
++lab:
++  if (a < 2)
++    {
++      int b = e;
++      _Bool d = a != 0;
++      _Bool f = b != 0;
++      unsigned long g = -(d & f);
++      unsigned long h = c & g;
++      unsigned long i = ~c;
++      e = -(i & h);
++      c = e != 0;
++      a = ~e + b;
++      foo (e);
++      goto lab;
++    }
++}
+
+base-commit: 9018336252463ffed28f01badfdea2a3ca3ba5c8
+-- 
+2.49.0
+
