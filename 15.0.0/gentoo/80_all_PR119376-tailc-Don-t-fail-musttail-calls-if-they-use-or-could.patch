@@ -1,0 +1,1124 @@
+https://inbox.sourceware.org/gcc-patches/Z+JccoSNxYWZIPz5@tucnak/
+
+From 4c5f092df307ec34b842483b1702d2e173e592a5 Mon Sep 17 00:00:00 2001
+Message-ID: <4c5f092df307ec34b842483b1702d2e173e592a5.1743280205.git.sam@gentoo.org>
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 25 Mar 2025 08:34:10 +0100
+Subject: [PATCH] tailc: Don't fail musttail calls if they use or could use
+ local arguments, instead warn [PR119376]
+
+Hi!
+
+As discussed here and in bugzilla, [[clang::musttail]] attribute in clang
+not just strongly asks for tail call or error, but changes behavior.
+To quote:
+https://clang.llvm.org/docs/AttributeReference.html#musttail
+"The lifetimes of all local variables and function parameters end immediately
+before the call to the function.  This means that it is undefined behaviour
+to pass a pointer or reference to a local variable to the called function,
+which is not the case without the attribute.  Clang will emit a warning in
+common cases where this happens."
+
+The GCC behavior was just to error if we can't prove the musttail callee
+could not have dereferenced escaped pointers to local vars or parameters
+of the caller.  That is still the case for variables with non-trivial
+destruction (even in clang), like vars with C++ non-trivial destructors or
+variables with cleanup attribute.
+
+The following patch changes the behavior to match that of clang, for all of
+[[clang::musttail]], [[gnu::musttail]] and __attribute__((musttail)).
+
+clang 20 actually added warning for some cases of it in
+https://github.com/llvm/llvm-project/pull/109255
+but it is under -Wreturn-stack-address warning.
+
+Now, gcc doesn't have that warning, but -Wreturn-local-addr instead, and
+IMHO it is better to have this under new warnings, because this isn't about
+returning local address, but about passing it to a musttail call, or maybe
+escaping to a musttail call.  And perhaps users will appreciate they can
+control it separately as well.
+
+The patch introduces 2 new warnings.
+-Wmusttail-local-addr
+which is turn on by default and warns for the always dumb cases of passing
+an address of a local variable or parameter to musttail call's argument.
+And then
+-Wmaybe-musttail-local-addr
+which is only diagnosed if -Wmusttail-local-addr was not diagnosed and
+diagnoses at most one (so that we don't emit 100s of warnings for one call
+if 100s of vars can escape) case where an address of a local var could have
+escaped to the musttail call.  This is less severe, the code doesn't have
+to be obviously wrong, so the warning is only enabled in -Wextra.
+
+And I've adjusted also the documentation for this change and addition of
+new warnings.
+
+Bootstrapped/regtested on x86_64-linux and i686-linux (on top of the
+just posted patch), ok for trunk?
+
+2025-03-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR ipa/119376
+	* common.opt (Wmusttail-local-addr, Wmaybe-musttail-local-addr): New.
+	* tree-tailcall.cc (suitable_for_tail_call_opt_p): Don't fail for
+	TREE_ADDRESSABLE PARM_DECLs for musttail calls if diag_musttail.
+	Emit -Wmusttail-local-addr warnings.
+	(maybe_error_musttail): Use gimple_location instead of directly
+	accessing location member.
+	(find_tail_calls): For musttail calls if diag_musttail, don't fail
+	if address of local could escape to the call, instead emit
+	-Wmaybe-musttail-local-addr warnings.  Emit
+	-Wmaybe-musttail-local-addr warnings also for address taken
+	parameters.
+	* common.opt.urls: Regenerate.
+	* doc/extend.texi (musttail statement attribute): Clarify local
+	variables without non-trivial destruction are considered out of scope
+	before the tail call instruction.
+	* doc/invoke.texi (-Wno-musttail-local-addr,
+	-Wmaybe-musttail-local-addr): Document.
+
+	* c-c++-common/musttail8.c: Expect a warning rather than error in one
+	case.
+	(f4): Add int * argument.
+	* c-c++-common/musttail15.c: Don't disallow for C++98.
+	* c-c++-common/musttail16.c: Likewise.
+	* c-c++-common/musttail17.c: Likewise.
+	* c-c++-common/musttail18.c: Likewise.
+	* c-c++-common/musttail19.c: Likewise.  Expect a warning rather than
+	error in one case.
+	(f4): Add int * argument.
+	* c-c++-common/musttail20.c: Don't disallow for C++98.
+	* c-c++-common/musttail21.c: Likewise.
+	* c-c++-common/musttail28.c: New test.
+	* c-c++-common/musttail29.c: New test.
+	* c-c++-common/musttail30.c: New test.
+	* c-c++-common/musttail31.c: New test.
+	* g++.dg/ext/musttail1.C: New test.
+	* g++.dg/ext/musttail2.C: New test.
+	* g++.dg/ext/musttail3.C: New test.
+---
+ gcc/common.opt                          |   8 ++
+ gcc/common.opt.urls                     |   6 ++
+ gcc/doc/extend.texi                     |  49 ++++++++++-
+ gcc/doc/invoke.texi                     |  52 ++++++++++-
+ gcc/testsuite/c-c++-common/musttail15.c |   2 +-
+ gcc/testsuite/c-c++-common/musttail16.c |   2 +-
+ gcc/testsuite/c-c++-common/musttail17.c |   2 +-
+ gcc/testsuite/c-c++-common/musttail18.c |   2 +-
+ gcc/testsuite/c-c++-common/musttail19.c |   7 +-
+ gcc/testsuite/c-c++-common/musttail20.c |   2 +-
+ gcc/testsuite/c-c++-common/musttail21.c |   2 +-
+ gcc/testsuite/c-c++-common/musttail28.c | 108 +++++++++++++++++++++++
+ gcc/testsuite/c-c++-common/musttail29.c | 109 ++++++++++++++++++++++++
+ gcc/testsuite/c-c++-common/musttail30.c | 109 ++++++++++++++++++++++++
+ gcc/testsuite/c-c++-common/musttail31.c | 109 ++++++++++++++++++++++++
+ gcc/testsuite/c-c++-common/musttail8.c  |   5 +-
+ gcc/testsuite/g++.dg/ext/musttail1.C    |  38 +++++++++
+ gcc/testsuite/g++.dg/ext/musttail2.C    |  38 +++++++++
+ gcc/testsuite/g++.dg/ext/musttail3.C    |  37 ++++++++
+ gcc/tree-tailcall.cc                    |  97 +++++++++++++++++++--
+ 20 files changed, 760 insertions(+), 24 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/musttail28.c
+ create mode 100644 gcc/testsuite/c-c++-common/musttail29.c
+ create mode 100644 gcc/testsuite/c-c++-common/musttail30.c
+ create mode 100644 gcc/testsuite/c-c++-common/musttail31.c
+ create mode 100644 gcc/testsuite/g++.dg/ext/musttail1.C
+ create mode 100644 gcc/testsuite/g++.dg/ext/musttail2.C
+ create mode 100644 gcc/testsuite/g++.dg/ext/musttail3.C
+
+diff --git a/gcc/common.opt b/gcc/common.opt
+index 2da02866ca08..9400c4b94e88 100644
+--- a/gcc/common.opt
++++ b/gcc/common.opt
+@@ -693,6 +693,14 @@ Does nothing. Preserved for backward compatibility.
+ Wmissing-noreturn
+ Common Warning Alias(Wsuggest-attribute=noreturn)
+ 
++Wmusttail-local-addr
++Common Var(warn_musttail_local_addr) Init(1) Warning
++Warn about passing a pointer/reference to a local or temporary variable to a musttail call argument.
++
++Wmaybe-musttail-local-addr
++Common Var(warn_maybe_musttail_local_addr) Warning EnabledBy(Wextra)
++Warn about pointer/reference to a local or temporary variable possibly escaping to a musttail call.
++
+ Wodr
+ Common Var(warn_odr_violations) Init(1) Warning
+ Warn about some C++ One Definition Rule violations during link time optimization.
+diff --git a/gcc/common.opt.urls b/gcc/common.opt.urls
+index e7900c825c17..860ebd01ace2 100644
+--- a/gcc/common.opt.urls
++++ b/gcc/common.opt.urls
+@@ -157,6 +157,12 @@ UrlSuffix(gcc/Warning-Options.html#index-Wno-unsafe-loop-optimizations)
+ Wmissing-noreturn
+ UrlSuffix(gcc/Warning-Options.html#index-Wmissing-noreturn)
+ 
++Wmusttail-local-addr
++UrlSuffix(gcc/Warning-Options.html#index-Wno-musttail-local-addr)
++
++Wmaybe-musttail-local-addr
++UrlSuffix(gcc/Warning-Options.html#index-Wmaybe-musttail-local-addr)
++
+ Wodr
+ UrlSuffix(gcc/Warning-Options.html#index-Wno-odr)
+ 
+diff --git a/gcc/doc/extend.texi b/gcc/doc/extend.texi
+index ed766e53dcc4..fcb6df95dcf5 100644
+--- a/gcc/doc/extend.texi
++++ b/gcc/doc/extend.texi
+@@ -9282,10 +9282,51 @@ __attribute__((musttail)) return bar();
+ 
+ If the compiler cannot generate a @code{musttail} tail call it will report
+ an error.  On some targets tail calls may never be supported.
+-Tail calls cannot reference locals in memory, which may affect
+-builds without optimization when passing small structures, or passing
+-or returning large structures.  Enabling @option{-O1} or @option{-O2} can
+-improve the success of tail calls.
++The user asserts for @code{musttail} tail calls that lifetime of automatic
++variables, function parameters and temporaries (unless they have non-trivial
++destruction) can end before the actual call instruction and that any access
++to those from inside of the called function results is considered undefined
++behavior.  Enabling @option{-O1} or @option{-O2} can improve the success of
++tail calls.
++
++@smallexample
++int foo (int *);
++void bar (int *);
++struct S @{ S (); ~S (); int s; @};
++
++int
++baz (int *x)
++@{
++  if (*x == 1)
++    @{
++      int a = 42;
++      /* The call will be tail called (would not be without the
++         attribute), dereferencing the pointer in the callee is
++         undefined behavior and there will be a warning emitted
++         for this by default (@option{-Wmusttail-local-addr}).  */
++      [[gnu::musttail]] return foo (&a);
++    @}
++  else if (*x == 2)
++    @{
++      int a = 42;
++      bar (&a);
++      /* The call will be tail called (would not be without the
++         attribute), if bar stores the pointer anywhere, dereferencing
++         it in foo will be undefined behavior and there will be a warning
++         emitted for this with @option{-Wextra}, which implies
++         @option{-Wmaybe-musttail-local-addr}.  */
++      [[gnu::musttail]] return foo (nullptr);
++    @}
++  else
++    @{
++      S s;
++      /* The s variable requires non-trivial destruction which ought
++         to be performed after the foo call returns, so this will
++         be rejected.  */
++      [[gnu::musttail]] return foo (&s.s);
++    @}
++@}
++@end smallexample
+ @end table
+ 
+ @node Attribute Syntax
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index df4610908243..2617406b7691 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -394,7 +394,8 @@ Objective-C and Objective-C++ Dialects}.
+ -Wmemset-elt-size  -Wmemset-transposed-args
+ -Wmisleading-indentation  -Wmissing-attributes  -Wmissing-braces
+ -Wmissing-field-initializers  -Wmissing-format-attribute
+--Wmissing-include-dirs  -Wmissing-noreturn  -Wno-missing-profile
++-Wmissing-include-dirs  -Wmissing-noreturn  -Wmusttail-local-addr
++-Wmaybe-musttail-local-addr  -Wno-missing-profile
+ -Wno-multichar  -Wmultistatement-macros  -Wnonnull  -Wnonnull-compare
+ -Wnormalized=@r{[}none@r{|}id@r{|}nfc@r{|}nfkc@r{]}
+ -Wnull-dereference  -Wno-odr
+@@ -6975,6 +6976,55 @@ is only active when @option{-fdelete-null-pointer-checks} is active,
+ which is enabled by optimizations in most targets.  The precision of
+ the warnings depends on the optimization options used.
+ 
++@opindex Wno-musttail-local-addr
++@opindex -Wmusttail-local-addr
++@item -Wno-musttail-local-addr
++Do not warn about passing a pointer (or in C++, a reference) to a
++local variable or label to argument of a @code{musttail} call.  Those
++variables go out of scope before the tail call instruction.
++
++@opindex Wmaybe-musttail-local-addr
++@opindex -Wno-maybe-musttail-local-addr
++@item -Wmaybe-musttail-local-addr
++Warn when address of a local variable can escape to a @code{musttail}
++call, unless it goes out of scope already before the @code{musttail}
++call.
++
++@smallexample
++int foo (int *);
++
++int
++bar (int *x)
++@{
++  if (x[0] == 1)
++    @{
++      int a = 42;
++      foo (&a);
++      /* Without the @code{musttail} attribute this call would not
++         be tail called, because address of the @code{a} variable escapes
++         and the second foo call could dereference it.  With the attribute
++         the local variables are assumed to go out of scope immediately
++         before the tail call instruction and the compiler warns about
++         this.  */
++      [[gnu::musttail]] return foo (nullptr);
++    @}
++  else
++    @{
++      @{
++        int a = 42;
++        foo (&a);
++      @}
++      /* The @code{a} variable isn't already in scope, so even when it
++         escaped, even without @code{musttail} attribute it would be
++         undefined behavior to dereference it and the compiler could
++         turn this into a tail call.  No warning is diagnosed here.  */
++      [[gnu::musttail]] return foo (nullptr);
++    @}
++@}
++@end smallexample
++
++This warning is enabled by @option{-Wextra}.
++
+ @opindex Wnrvo
+ @opindex Wno-nrvo
+ @item -Wnrvo @r{(C++ and Objective-C++ only)}
+diff --git a/gcc/testsuite/c-c++-common/musttail15.c b/gcc/testsuite/c-c++-common/musttail15.c
+index 2addc971922c..b8223d77fd56 100644
+--- a/gcc/testsuite/c-c++-common/musttail15.c
++++ b/gcc/testsuite/c-c++-common/musttail15.c
+@@ -1,4 +1,4 @@
+-/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++/* { dg-do compile { target musttail } } */
+ /* { dg-additional-options "-fdelayed-branch" { target sparc*-*-* } } */
+ 
+ int __attribute__((noinline,noclone,noipa))
+diff --git a/gcc/testsuite/c-c++-common/musttail16.c b/gcc/testsuite/c-c++-common/musttail16.c
+index b1e2ff3e6dc8..f27a27923314 100644
+--- a/gcc/testsuite/c-c++-common/musttail16.c
++++ b/gcc/testsuite/c-c++-common/musttail16.c
+@@ -1,4 +1,4 @@
+-/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++/* { dg-do compile { target musttail } } */
+ 
+ struct box { char field[256]; int i; };
+ 
+diff --git a/gcc/testsuite/c-c++-common/musttail17.c b/gcc/testsuite/c-c++-common/musttail17.c
+index 490f3c35ca23..58fab84993bf 100644
+--- a/gcc/testsuite/c-c++-common/musttail17.c
++++ b/gcc/testsuite/c-c++-common/musttail17.c
+@@ -1,4 +1,4 @@
+-/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++/* { dg-do compile { target musttail } } */
+ 
+ struct box { char field[64]; int i; };
+ 
+diff --git a/gcc/testsuite/c-c++-common/musttail18.c b/gcc/testsuite/c-c++-common/musttail18.c
+index 4f34a8d27f36..ab608871fd08 100644
+--- a/gcc/testsuite/c-c++-common/musttail18.c
++++ b/gcc/testsuite/c-c++-common/musttail18.c
+@@ -1,4 +1,4 @@
+-/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++/* { dg-do compile { target musttail } } */
+ /* { dg-additional-options "-fdelayed-branch" { target sparc*-*-* } } */
+ 
+ void __attribute__((noipa)) f() {}
+diff --git a/gcc/testsuite/c-c++-common/musttail19.c b/gcc/testsuite/c-c++-common/musttail19.c
+index 70f9eaff139c..a592b69c1b7c 100644
+--- a/gcc/testsuite/c-c++-common/musttail19.c
++++ b/gcc/testsuite/c-c++-common/musttail19.c
+@@ -1,4 +1,4 @@
+-/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++/* { dg-do compile { target musttail } } */
+ 
+ float f1(void);
+ 
+@@ -10,8 +10,9 @@ int f2(void)
+ 
+ int f3(int *);
+ 
+-int f4(void)
++int f4(int *p)
+ {
+   int x;
+-  __attribute__((musttail)) return f3(&x); /* { dg-error "\(refers to locals|other reasons\)" } */
++  (void) p;
++  __attribute__((musttail)) return f3(&x); /* { dg-warning "address of automatic variable 'x' passed to 'musttail' call argument" } */
+ }
+diff --git a/gcc/testsuite/c-c++-common/musttail20.c b/gcc/testsuite/c-c++-common/musttail20.c
+index 70f14ff2f217..1931f2cc8e4a 100644
+--- a/gcc/testsuite/c-c++-common/musttail20.c
++++ b/gcc/testsuite/c-c++-common/musttail20.c
+@@ -1,4 +1,4 @@
+-/* { dg-do compile { target { struct_musttail && { c || c++11 } } } } */
++/* { dg-do compile { target struct_musttail } } */
+ /* { dg-additional-options "-fdelayed-branch" { target sparc*-*-* } } */
+ 
+ struct str
+diff --git a/gcc/testsuite/c-c++-common/musttail21.c b/gcc/testsuite/c-c++-common/musttail21.c
+index 954209ddcd51..1a109e1955dc 100644
+--- a/gcc/testsuite/c-c++-common/musttail21.c
++++ b/gcc/testsuite/c-c++-common/musttail21.c
+@@ -1,4 +1,4 @@
+-/* { dg-do compile { target { c || c++11 } } } */
++/* { dg-do compile { target musttail } } */
+ void f(void)
+ {
+   __attribute__((musttail)) return; /* { dg-error "cannot tail-call.*return value must be a call" } */
+diff --git a/gcc/testsuite/c-c++-common/musttail28.c b/gcc/testsuite/c-c++-common/musttail28.c
+new file mode 100644
+index 000000000000..d84658aa8a05
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/musttail28.c
+@@ -0,0 +1,108 @@
++/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++
++int foo (int, void *);
++int bar (int, int *);
++struct S { int a, b, c; };
++struct T { int d; struct S e; };
++
++int
++baz (int x, void *y)
++{
++  [[gnu::musttail]] return bar (2, &x);		/* { dg-warning "address of parameter 'x' passed to 'musttail' call argument" } */
++}
++
++int
++qux (int x, void *y)
++{
++  __label__ lab;
++  lab:;
++  if (*(int *) y == 1)
++    [[gnu::musttail]] return foo (1, &&lab);	/* { dg-warning "address of label passed to 'musttail' call argument" } */
++  if (x == 1)
++    [[gnu::musttail]] return foo (3, 0);
++  else if (x == 2)
++    {
++      {
++        int a = 42;
++        bar (4, &a);
++      }
++      [[gnu::musttail]] return bar (5, 0);
++    }
++  else if (x == 3)
++    {
++      int a = 42;
++      bar (4, &a);
++      [[gnu::musttail]] return bar (6, 0);
++    }
++  else if (x == 4)
++    {
++      int a = 42;
++      [[gnu::musttail]] return bar (7, &a);	/* { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" } */
++    }
++  else if (x == 5)
++    {
++      struct T b;
++      [[gnu::musttail]] return bar (8, &b.e.b);	/* { dg-warning "address of automatic variable 'b' passed to 'musttail' call argument" } */
++    }
++  else if (x == 6)
++    {
++      struct T b;
++      bar (9, &b.e.a);
++      [[gnu::musttail]] return bar (10, 0);
++    }
++  else if (x == 7)
++    {
++      {
++        struct T b;
++        bar (9, &b.e.a);
++      }
++      [[gnu::musttail]] return bar (11, 0);
++    }
++  else if (x == 8)
++    {
++      {
++        int a = 42;
++        bar (4, &a);
++      }
++      [[gnu::musttail]] return foo (12, 0);
++    }
++  else if (x == 9)
++    {
++      int a = 42;
++      bar (4, &a);
++      [[gnu::musttail]] return foo (13, 0);
++    }
++  else if (x == 10)
++    {
++      int a = 42;
++      [[gnu::musttail]] return foo (14, &a);	/* { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" } */
++    }
++  else if (x == 11)
++    {
++      struct T b;
++      [[gnu::musttail]] return foo (15, &b.e.b); /* { dg-warning "address of automatic variable 'b' passed to 'musttail' call argument" } */
++    }
++  else if (x == 12)
++    {
++      struct T b;
++      bar (9, &b.e.a);
++      [[gnu::musttail]] return foo (16, 0);
++    }
++  else if (x == 13)
++    {
++      {
++        struct T b;
++        bar (9, &b.e.a);
++      }
++      [[gnu::musttail]] return foo (17, 0);
++    }
++  return 0;
++}
++
++int
++corge (int x, void *y)
++{
++  if (*(int *) y == 1)
++    bar (18, &x);
++  [[gnu::musttail]] return bar (2, 0);
++}
+diff --git a/gcc/testsuite/c-c++-common/musttail29.c b/gcc/testsuite/c-c++-common/musttail29.c
+new file mode 100644
+index 000000000000..f6b3d76abe11
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/musttail29.c
+@@ -0,0 +1,109 @@
++/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++/* { dg-options "-O2 -Wmusttail-local-addr" } */
++
++int foo (int, void *);
++int bar (int, int *);
++struct S { int a, b, c; };
++struct T { int d; struct S e; };
++
++int
++baz (int x, void *y)
++{
++  [[gnu::musttail]] return bar (2, &x);		/* { dg-warning "address of parameter 'x' passed to 'musttail' call argument" } */
++}
++
++int
++qux (int x, void *y)
++{
++  __label__ lab;
++  lab:;
++  if (*(int *) y == 1)
++    [[gnu::musttail]] return foo (1, &&lab);	/* { dg-warning "address of label passed to 'musttail' call argument" } */
++  if (x == 1)
++    [[gnu::musttail]] return foo (3, 0);
++  else if (x == 2)
++    {
++      {
++        int a = 42;
++        bar (4, &a);
++      }
++      [[gnu::musttail]] return bar (5, 0);
++    }
++  else if (x == 3)
++    {
++      int a = 42;
++      bar (4, &a);
++      [[gnu::musttail]] return bar (6, 0);
++    }
++  else if (x == 4)
++    {
++      int a = 42;
++      [[gnu::musttail]] return bar (7, &a);	/* { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" } */
++    }
++  else if (x == 5)
++    {
++      struct T b;
++      [[gnu::musttail]] return bar (8, &b.e.b);	/* { dg-warning "address of automatic variable 'b' passed to 'musttail' call argument" } */
++    }
++  else if (x == 6)
++    {
++      struct T b;
++      bar (9, &b.e.a);
++      [[gnu::musttail]] return bar (10, 0);
++    }
++  else if (x == 7)
++    {
++      {
++        struct T b;
++        bar (9, &b.e.a);
++      }
++      [[gnu::musttail]] return bar (11, 0);
++    }
++  else if (x == 8)
++    {
++      {
++        int a = 42;
++        bar (4, &a);
++      }
++      [[gnu::musttail]] return foo (12, 0);
++    }
++  else if (x == 9)
++    {
++      int a = 42;
++      bar (4, &a);
++      [[gnu::musttail]] return foo (13, 0);
++    }
++  else if (x == 10)
++    {
++      int a = 42;
++      [[gnu::musttail]] return foo (14, &a);	/* { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" } */
++    }
++  else if (x == 11)
++    {
++      struct T b;
++      [[gnu::musttail]] return foo (15, &b.e.b); /* { dg-warning "address of automatic variable 'b' passed to 'musttail' call argument" } */
++    }
++  else if (x == 12)
++    {
++      struct T b;
++      bar (9, &b.e.a);
++      [[gnu::musttail]] return foo (16, 0);
++    }
++  else if (x == 13)
++    {
++      {
++        struct T b;
++        bar (9, &b.e.a);
++      }
++      [[gnu::musttail]] return foo (17, 0);
++    }
++  return 0;
++}
++
++int
++corge (int x, void *y)
++{
++  if (*(int *) y == 1)
++    bar (18, &x);
++  [[gnu::musttail]] return bar (2, 0);
++}
+diff --git a/gcc/testsuite/c-c++-common/musttail30.c b/gcc/testsuite/c-c++-common/musttail30.c
+new file mode 100644
+index 000000000000..be1c3daf6af2
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/musttail30.c
+@@ -0,0 +1,109 @@
++/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++/* { dg-options "-Wextra" } */
++
++int foo (int, void *);
++int bar (int, int *);
++struct S { int a, b, c; };
++struct T { int d; struct S e; };
++
++int
++baz (int x, void *y)
++{
++  [[gnu::musttail]] return bar (2, &x);		/* { dg-warning "address of parameter 'x' passed to 'musttail' call argument" } */
++}
++
++int
++qux (int x, void *y)
++{
++  __label__ lab;
++  lab:;
++  if (*(int *) y == 1)
++    [[gnu::musttail]] return foo (1, &&lab);	/* { dg-warning "address of label passed to 'musttail' call argument" } */
++  if (x == 1)
++    [[gnu::musttail]] return foo (3, 0);
++  else if (x == 2)
++    {
++      {
++        int a = 42;
++        bar (4, &a);
++      }
++      [[gnu::musttail]] return bar (5, 0);
++    }
++  else if (x == 3)
++    {
++      int a = 42;
++      bar (4, &a);
++      [[gnu::musttail]] return bar (6, 0);	/* { dg-warning "address of automatic variable 'a' can escape to 'musttail' call" } */
++    }
++  else if (x == 4)
++    {
++      int a = 42;
++      [[gnu::musttail]] return bar (7, &a);	/* { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" } */
++    }
++  else if (x == 5)
++    {
++      struct T b;
++      [[gnu::musttail]] return bar (8, &b.e.b);	/* { dg-warning "address of automatic variable 'b' passed to 'musttail' call argument" } */
++    }
++  else if (x == 6)
++    {
++      struct T b;
++      bar (9, &b.e.a);
++      [[gnu::musttail]] return bar (10, 0);	/* { dg-warning "address of automatic variable 'b' can escape to 'musttail' call" } */
++    }
++  else if (x == 7)
++    {
++      {
++        struct T b;
++        bar (9, &b.e.a);
++      }
++      [[gnu::musttail]] return bar (11, 0);
++    }
++  else if (x == 8)
++    {
++      {
++        int a = 42;
++        bar (4, &a);
++      }
++      [[gnu::musttail]] return foo (12, 0);
++    }
++  else if (x == 9)
++    {
++      int a = 42;
++      bar (4, &a);
++      [[gnu::musttail]] return foo (13, 0);	/* { dg-warning "address of automatic variable 'a' can escape to 'musttail' call" } */
++    }
++  else if (x == 10)
++    {
++      int a = 42;
++      [[gnu::musttail]] return foo (14, &a);	/* { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" } */
++    }
++  else if (x == 11)
++    {
++      struct T b;
++      [[gnu::musttail]] return foo (15, &b.e.b); /* { dg-warning "address of automatic variable 'b' passed to 'musttail' call argument" } */
++    }
++  else if (x == 12)
++    {
++      struct T b;
++      bar (9, &b.e.a);
++      [[gnu::musttail]] return foo (16, 0);	/* { dg-warning "address of automatic variable 'b' can escape to 'musttail' call" } */
++    }
++  else if (x == 13)
++    {
++      {
++        struct T b;
++        bar (9, &b.e.a);
++      }
++      [[gnu::musttail]] return foo (17, 0);
++    }
++  return 0;
++}
++
++int
++corge (int x, void *y)
++{
++  if (*(int *) y == 1)
++    bar (18, &x);
++  [[gnu::musttail]] return bar (2, 0);		/* { dg-warning "address of parameter 'x' can escape to 'musttail' call" } */
++}
+diff --git a/gcc/testsuite/c-c++-common/musttail31.c b/gcc/testsuite/c-c++-common/musttail31.c
+new file mode 100644
+index 000000000000..f44ada4d4733
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/musttail31.c
+@@ -0,0 +1,109 @@
++/* { dg-do compile { target { musttail && { c || c++11 } } } } */
++/* { dg-options "-O2 -Wmaybe-musttail-local-addr" } */
++
++int foo (int, void *);
++int bar (int, int *);
++struct S { int a, b, c; };
++struct T { int d; struct S e; };
++
++int
++baz (int x, void *y)
++{
++  [[gnu::musttail]] return bar (2, &x);		/* { dg-warning "address of parameter 'x' passed to 'musttail' call argument" } */
++}
++
++int
++qux (int x, void *y)
++{
++  __label__ lab;
++  lab:;
++  if (*(int *) y == 1)
++    [[gnu::musttail]] return foo (1, &&lab);	/* { dg-warning "address of label passed to 'musttail' call argument" } */
++  if (x == 1)
++    [[gnu::musttail]] return foo (3, 0);
++  else if (x == 2)
++    {
++      {
++        int a = 42;
++        bar (4, &a);
++      }
++      [[gnu::musttail]] return bar (5, 0);
++    }
++  else if (x == 3)
++    {
++      int a = 42;
++      bar (4, &a);
++      [[gnu::musttail]] return bar (6, 0);	/* { dg-warning "address of automatic variable 'a' can escape to 'musttail' call" } */
++    }
++  else if (x == 4)
++    {
++      int a = 42;
++      [[gnu::musttail]] return bar (7, &a);	/* { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" } */
++    }
++  else if (x == 5)
++    {
++      struct T b;
++      [[gnu::musttail]] return bar (8, &b.e.b);	/* { dg-warning "address of automatic variable 'b' passed to 'musttail' call argument" } */
++    }
++  else if (x == 6)
++    {
++      struct T b;
++      bar (9, &b.e.a);
++      [[gnu::musttail]] return bar (10, 0);	/* { dg-warning "address of automatic variable 'b' can escape to 'musttail' call" } */
++    }
++  else if (x == 7)
++    {
++      {
++        struct T b;
++        bar (9, &b.e.a);
++      }
++      [[gnu::musttail]] return bar (11, 0);
++    }
++  else if (x == 8)
++    {
++      {
++        int a = 42;
++        bar (4, &a);
++      }
++      [[gnu::musttail]] return foo (12, 0);
++    }
++  else if (x == 9)
++    {
++      int a = 42;
++      bar (4, &a);
++      [[gnu::musttail]] return foo (13, 0);	/* { dg-warning "address of automatic variable 'a' can escape to 'musttail' call" } */
++    }
++  else if (x == 10)
++    {
++      int a = 42;
++      [[gnu::musttail]] return foo (14, &a);	/* { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" } */
++    }
++  else if (x == 11)
++    {
++      struct T b;
++      [[gnu::musttail]] return foo (15, &b.e.b); /* { dg-warning "address of automatic variable 'b' passed to 'musttail' call argument" } */
++    }
++  else if (x == 12)
++    {
++      struct T b;
++      bar (9, &b.e.a);
++      [[gnu::musttail]] return foo (16, 0);	/* { dg-warning "address of automatic variable 'b' can escape to 'musttail' call" } */
++    }
++  else if (x == 13)
++    {
++      {
++        struct T b;
++        bar (9, &b.e.a);
++      }
++      [[gnu::musttail]] return foo (17, 0);
++    }
++  return 0;
++}
++
++int
++corge (int x, void *y)
++{
++  if (*(int *) y == 1)
++    bar (18, &x);
++  [[gnu::musttail]] return bar (2, 0);		/* { dg-warning "address of parameter 'x' can escape to 'musttail' call" } */
++}
+diff --git a/gcc/testsuite/c-c++-common/musttail8.c b/gcc/testsuite/c-c++-common/musttail8.c
+index 50ca1ac0dd48..9a29030a3b06 100644
+--- a/gcc/testsuite/c-c++-common/musttail8.c
++++ b/gcc/testsuite/c-c++-common/musttail8.c
+@@ -10,8 +10,9 @@ int f2(void)
+ 
+ int f3(int *);
+ 
+-int f4(void)
++int f4(int *p)
+ {
+   int x;
+-  [[gnu::musttail]] return f3(&x); /* { dg-error "\(refers to locals|other reasons\)" } */
++  (void) p;
++  [[gnu::musttail]] return f3(&x); /* { dg-warning "address of automatic variable 'x' passed to 'musttail' call argument" } */
+ }
+diff --git a/gcc/testsuite/g++.dg/ext/musttail1.C b/gcc/testsuite/g++.dg/ext/musttail1.C
+new file mode 100644
+index 000000000000..fd9b386a5974
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/ext/musttail1.C
+@@ -0,0 +1,38 @@
++// PR ipa/119376
++// { dg-do compile { target { musttail && c++11 } } }
++// { dg-options "-Wmaybe-musttail-local-addr" }
++
++int foo (int &);
++int bar (int &&);
++int corge (int *);
++
++int
++baz (int &x)
++{
++  if (x == 1)
++    [[gnu::musttail]] return foo (x);
++  if (x == 2)
++    {
++      int a = 42;
++      [[gnu::musttail]] return foo (a);		// { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" }
++    }
++  if (x == 3)
++    {
++      int a = 42;
++      foo (a);
++      [[gnu::musttail]] return foo (x);		// { dg-warning "address of automatic variable 'a' can escape to 'musttail' call" }
++    }
++  return 0;
++}
++
++int
++qux (int &&x)
++{
++  [[gnu::musttail]] return bar (x + 1);		// { dg-warning "address of local variable passed to 'musttail' call argument" }
++}
++
++int
++freddy (int x)
++{
++  [[gnu::musttail]] return foo (x);		// { dg-warning "address of parameter 'x' passed to 'musttail' call argument" }
++}
+diff --git a/gcc/testsuite/g++.dg/ext/musttail2.C b/gcc/testsuite/g++.dg/ext/musttail2.C
+new file mode 100644
+index 000000000000..ac99aafb0f0c
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/ext/musttail2.C
+@@ -0,0 +1,38 @@
++// PR ipa/119376
++// { dg-do compile { target { musttail && c++11 } } }
++// { dg-options "-Wextra" }
++
++int foo (int &);
++int bar (int &&);
++int corge (int *);
++
++int
++baz (int &x)
++{
++  if (x == 1)
++    [[clang::musttail]] return foo (x);
++  if (x == 2)
++    {
++      int a = 42;
++      [[clang::musttail]] return foo (a);		// { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" }
++    }
++  if (x == 3)
++    {
++      int a = 42;
++      foo (a);
++      [[clang::musttail]] return foo (x);		// { dg-warning "address of automatic variable 'a' can escape to 'musttail' call" }
++    }
++  return 0;
++}
++
++int
++qux (int &&x)
++{
++  [[clang::musttail]] return bar (x + 1);		// { dg-warning "address of local variable passed to 'musttail' call argument" }
++}
++
++int
++freddy (int x)
++{
++  [[clang::musttail]] return foo (x);			// { dg-warning "address of parameter 'x' passed to 'musttail' call argument" }
++}
+diff --git a/gcc/testsuite/g++.dg/ext/musttail3.C b/gcc/testsuite/g++.dg/ext/musttail3.C
+new file mode 100644
+index 000000000000..1c4b939a2a43
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/ext/musttail3.C
+@@ -0,0 +1,37 @@
++// PR ipa/119376
++// { dg-do compile { target { musttail && c++11 } } }
++
++int foo (int &);
++int bar (int &&);
++int corge (int *);
++
++int
++baz (int &x)
++{
++  if (x == 1)
++    [[gnu::musttail]] return foo (x);
++  if (x == 2)
++    {
++      int a = 42;
++      [[gnu::musttail]] return foo (a);		// { dg-warning "address of automatic variable 'a' passed to 'musttail' call argument" }
++    }
++  if (x == 3)
++    {
++      int a = 42;
++      foo (a);
++      [[gnu::musttail]] return foo (x);
++    }
++  return 0;
++}
++
++int
++qux (int &&x)
++{
++  [[gnu::musttail]] return bar (x + 1);		// { dg-warning "address of local variable passed to 'musttail' call argument" }
++}
++
++int
++freddy (int x)
++{
++  [[gnu::musttail]] return foo (x);		// { dg-warning "address of parameter 'x' passed to 'musttail' call argument" }
++}
+diff --git a/gcc/tree-tailcall.cc b/gcc/tree-tailcall.cc
+index 8ba675221915..e025a1cb78b2 100644
+--- a/gcc/tree-tailcall.cc
++++ b/gcc/tree-tailcall.cc
+@@ -206,14 +206,48 @@ suitable_for_tail_call_opt_p (gcall *call, bool diag_musttail)
+ 
+   /* ??? It is OK if the argument of a function is taken in some cases,
+      but not in all cases.  See PR15387 and PR19616.  Revisit for 4.1.  */
+-  for (param = DECL_ARGUMENTS (current_function_decl);
+-       param;
+-       param = DECL_CHAIN (param))
+-    if (TREE_ADDRESSABLE (param))
++  if (!diag_musttail || !gimple_call_must_tail_p (call))
++    for (param = DECL_ARGUMENTS (current_function_decl);
++	 param; param = DECL_CHAIN (param))
++      if (TREE_ADDRESSABLE (param))
++	{
++	  maybe_error_musttail (call, _("address of caller arguments taken"),
++				diag_musttail);
++	  return false;
++	}
++
++  if (diag_musttail
++      && gimple_call_must_tail_p (call)
++      && warn_musttail_local_addr)
++    for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
+       {
+-	maybe_error_musttail (call, _("address of caller arguments taken"),
+-			      diag_musttail);
+-	return false;
++	tree arg = gimple_call_arg (call, i);
++	if (!POINTER_TYPE_P (TREE_TYPE (arg)))
++	  continue;
++	if (TREE_CODE (arg) == ADDR_EXPR)
++	  {
++	    arg = get_base_address (TREE_OPERAND (arg, 0));
++	    if (auto_var_in_fn_p (arg, current_function_decl))
++	      {
++		if (TREE_CODE (arg) == LABEL_DECL)
++		  warning_at (gimple_location (call), OPT_Wmusttail_local_addr,
++			      "address of label passed to %<musttail%> "
++			      "call argument");
++		else if (TREE_CODE (arg) == PARM_DECL)
++		  warning_at (gimple_location (call), OPT_Wmusttail_local_addr,
++			      "address of parameter %qD passed to "
++			      "%<musttail%> call argument", arg);
++		else if (!DECL_ARTIFICIAL (arg) && DECL_NAME (arg))
++		  warning_at (gimple_location (call), OPT_Wmusttail_local_addr,
++			      "address of automatic variable %qD passed to "
++			      "%<musttail%> call argument", arg);
++		else
++		  warning_at (gimple_location (call), OPT_Wmusttail_local_addr,
++			      "address of local variable passed to "
++			      "%<musttail%> call argument");
++		suppress_warning (call, OPT_Wmaybe_musttail_local_addr);
++	      }
++	  }
+       }
+ 
+   return true;
+@@ -443,7 +477,7 @@ maybe_error_musttail (gcall *call, const char *err, bool diag_musttail)
+ {
+   if (gimple_call_must_tail_p (call) && diag_musttail)
+     {
+-      error_at (call->location, "cannot tail-call: %s", err);
++      error_at (gimple_location (call), "cannot tail-call: %s", err);
+       /* Avoid another error. ??? If there are multiple reasons why tail
+ 	 calls fail it might be useful to report them all to avoid
+ 	 whack-a-mole for the user. But currently there is too much
+@@ -728,6 +762,19 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
+ 	{
+ 	  if (!VAR_P (var))
+ 	    {
++	      if (diag_musttail && gimple_call_must_tail_p (call))
++		{
++		  auto opt = OPT_Wmaybe_musttail_local_addr;
++		  if (!warning_suppressed_p (call,
++					     opt))
++		    {
++		      warning_at (gimple_location (call), opt,
++				  "address of local variable can escape to "
++				  "%<musttail%> call");
++		      suppress_warning (call, opt);
++		    }
++		  continue;
++		}
+ 	      if (local_live_vars)
+ 		BITMAP_FREE (local_live_vars);
+ 	      maybe_error_musttail (call,
+@@ -740,6 +787,24 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
+ 	      unsigned int *v = live_vars->get (DECL_UID (var));
+ 	      if (bitmap_bit_p (local_live_vars, *v))
+ 		{
++		  if (diag_musttail && gimple_call_must_tail_p (call))
++		    {
++		      auto opt = OPT_Wmaybe_musttail_local_addr;
++		      if (!warning_suppressed_p (call, opt))
++			{
++			  if (!DECL_ARTIFICIAL (var) && DECL_NAME (var))
++			    warning_at (gimple_location (call), opt,
++					"address of automatic variable %qD "
++					"can escape to %<musttail%> call",
++					var);
++			  else
++			    warning_at (gimple_location (call), opt,
++					"address of local variable can escape "
++					"to %<musttail%> call");
++			  suppress_warning (call, opt);
++			}
++		      continue;
++		    }
+ 		  BITMAP_FREE (local_live_vars);
+ 		  maybe_error_musttail (call,
+ 					_("call invocation refers to locals"),
+@@ -749,6 +814,22 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
+ 	    }
+ 	}
+     }
++  if (diag_musttail
++      && gimple_call_must_tail_p (call)
++      && !warning_suppressed_p (call, OPT_Wmaybe_musttail_local_addr))
++    for (tree param = DECL_ARGUMENTS (current_function_decl);
++	 param; param = DECL_CHAIN (param))
++      if (may_be_aliased (param)
++	  && (ref_maybe_used_by_stmt_p (call, param, false)
++	      || call_may_clobber_ref_p (call, param, false)))
++	{
++	  auto opt = OPT_Wmaybe_musttail_local_addr;
++	  warning_at (gimple_location (call), opt,
++		      "address of parameter %qD can escape to "
++		      "%<musttail%> call", param);
++	  suppress_warning (call, opt);
++	  break;
++	}
+ 
+   if (local_live_vars)
+     BITMAP_FREE (local_live_vars);
+
+base-commit: eb26b667518c951d06f3c51118a1d41dcdda8b99
+-- 
+2.49.0
+
