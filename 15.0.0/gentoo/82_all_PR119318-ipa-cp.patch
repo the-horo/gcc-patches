@@ -1,0 +1,168 @@
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119318#c5
+
+Subject: [PATCH] ipa-cp: Make propagation of bits in IPA-CP aware of type conversions (PR119318)
+
+After the propagation of constants and value ranges, it turns out
+that the propagation of known bits also needs to be made aware of any
+intermediate types in which any arithmetic operations are made and
+must limit its precision there.  This implements just that.
+
+Bootstrapped and tested on x86_64-linux.
+
+gcc/ChangeLog:
+
+2025-03-18  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/119318
+	* ipa-cp.cc (ipcp_bits_lattice::meet_with_1): Set all mask bits
+	not covered by precision to one.
+	(ipcp_bits_lattice::meet_with): Likewise.
+	(propagate_bits_across_jump_function): Use the first operand type
+	rather than the final parameter one to perform meet with other
+	lattices.  Check the operation conforms with
+	expr_type_first_operand_type_p.
+	* tree.cc (expr_type_first_operand_type_p): Add POINTER_PLUS_EXPR.
+
+gcc/testsuite/ChangeLog:
+
+2025-03-18  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/119318
+	* gcc.dg/ipa/pr119318.c: New test.
+---
+ gcc/ipa-cp.cc                       | 26 +++++++++++++++++---
+ gcc/testsuite/gcc.dg/ipa/pr119318.c | 38 +++++++++++++++++++++++++++++
+ gcc/tree.cc                         |  1 +
+ 3 files changed, 61 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/ipa/pr119318.c
+
+diff --git a/gcc/ipa-cp.cc b/gcc/ipa-cp.cc
+index 264568989a9..eff20a9ac55 100644
+--- a/gcc/ipa-cp.cc
++++ b/gcc/ipa-cp.cc
+@@ -918,6 +918,8 @@ ipcp_bits_lattice::meet_with_1 (widest_int value, widest_int mask,
+     m_mask |= m_value;
+   m_value &= ~m_mask;
+ 
++  widest_int cap_mask = wi::bit_not (wi::sub (wi::lshift (1, precision), 1));
++  m_mask |= cap_mask;
+   if (wi::sext (m_mask, precision) == -1)
+     return set_to_bottom ();
+ 
+@@ -996,6 +998,8 @@ ipcp_bits_lattice::meet_with (ipcp_bits_lattice& other, unsigned precision,
+ 	  adjusted_mask |= adjusted_value;
+ 	  adjusted_value &= ~adjusted_mask;
+ 	}
++      widest_int cap_mask = wi::bit_not (wi::sub (wi::lshift (1, precision), 1));
++      adjusted_mask |= cap_mask;
+       if (wi::sext (adjusted_mask, precision) == -1)
+ 	return set_to_bottom ();
+       return set_to_constant (adjusted_value, adjusted_mask);
+@@ -2507,9 +2511,6 @@ propagate_bits_across_jump_function (cgraph_edge *cs, int idx,
+       return dest_lattice->set_to_bottom ();
+     }
+ 
+-  unsigned precision = TYPE_PRECISION (parm_type);
+-  signop sgn = TYPE_SIGN (parm_type);
+-
+   if (jfunc->type == IPA_JF_PASS_THROUGH
+       || jfunc->type == IPA_JF_ANCESTOR)
+     {
+@@ -2522,6 +2523,16 @@ propagate_bits_across_jump_function (cgraph_edge *cs, int idx,
+       if (jfunc->type == IPA_JF_PASS_THROUGH)
+ 	{
+ 	  code = ipa_get_jf_pass_through_operation (jfunc);
++	  if (code != NOP_EXPR
++	      && !expr_type_first_operand_type_p (code))
++	    {
++	      if (dump_file && (dump_flags & TDF_DETAILS))
++		fprintf (dump_file, "Setting dest_lattice to bottom, because "
++			 "the operation involved in computing param %i of %s "
++			 "does not preserve types.\n",
++		 idx, cs->callee->dump_name ());
++	      return dest_lattice->set_to_bottom ();
++	    }
+ 	  src_idx = ipa_get_jf_pass_through_formal_id (jfunc);
+ 	  if (code != NOP_EXPR)
+ 	    operand = ipa_get_jf_pass_through_operand (jfunc);
+@@ -2554,6 +2565,12 @@ propagate_bits_across_jump_function (cgraph_edge *cs, int idx,
+ 	  bool drop_all_ones
+ 	    = keep_null && !src_lats->bits_lattice.known_nonzero_p ();
+ 
++	  tree arg_type = ipa_get_type (caller_info, src_idx);
++	  if (!arg_type)
++	    return dest_lattice->set_to_bottom ();
++	  unsigned precision = TYPE_PRECISION (arg_type);
++	  signop sgn = TYPE_SIGN (arg_type);
++
+ 	  return dest_lattice->meet_with (src_lats->bits_lattice, precision,
+ 					  sgn, code, operand, drop_all_ones);
+ 	}
+@@ -2570,7 +2587,8 @@ propagate_bits_across_jump_function (cgraph_edge *cs, int idx,
+ 	    = widest_int::from (bm.mask (), TYPE_SIGN (parm_type));
+ 	  widest_int value
+ 	    = widest_int::from (bm.value (), TYPE_SIGN (parm_type));
+-	  return dest_lattice->meet_with (value, mask, precision);
++	  return dest_lattice->meet_with (value, mask,
++					  TYPE_PRECISION (parm_type));
+ 	}
+     }
+   return dest_lattice->set_to_bottom ();
+diff --git a/gcc/testsuite/gcc.dg/ipa/pr119318.c b/gcc/testsuite/gcc.dg/ipa/pr119318.c
+new file mode 100644
+index 00000000000..8e62ec5e350
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/ipa/pr119318.c
+@@ -0,0 +1,38 @@
++/* { dg-do run } */
++/* { dg-require-effective-target int128 } */
++/* { dg-additional-options "-Wno-psabi -w" } */
++/* { dg-options "-Wno-psabi -O2" } */
++
++typedef unsigned V __attribute__((vector_size (64)));
++typedef unsigned __int128 W __attribute__((vector_size (64)));
++
++W a;
++W b;
++W c = { -0xffff, -0xffff, -0xffff, -0xffff };
++
++static __attribute__((__noinline__, __noclone__)) W
++bar (unsigned __int128 u)
++{
++  return u + c;
++}
++
++static inline W
++foo (unsigned short s, V v)
++{
++  V y = (V) bar ((unsigned short) ~s);
++  v >>= y;
++  b ^= (W) a;
++  v *= v;
++  return (W) v + b;
++}
++
++
++int
++main ()
++{
++  W x = foo (0, (V) { 0, 5 });
++  for (unsigned i = 0; i < sizeof(x)/sizeof(x[0]); i++)
++    if (x[i] != (i ? 0 : 0x1900000000))
++      __builtin_abort();
++  return 0;
++}
+diff --git a/gcc/tree.cc b/gcc/tree.cc
+index eccfcc89da4..6a5d9d4d741 100644
+--- a/gcc/tree.cc
++++ b/gcc/tree.cc
+@@ -15051,6 +15051,7 @@ expr_type_first_operand_type_p (tree_code code)
+     case BIT_IOR_EXPR:
+     case BIT_XOR_EXPR:
+     case BIT_AND_EXPR:
++    case POINTER_PLUS_EXPR:
+ 
+     case LSHIFT_EXPR:
+     case RSHIFT_EXPR:
+-- 
+2.48.1
