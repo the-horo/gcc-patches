@@ -1,0 +1,323 @@
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c4
+
+2025-04-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/119491
+	* tree-tailcall.cc (independent_of_stmt_p): Use
+	find_fallthru_edge (bb->succs)->dest instead of single_succ (bb).
+	(empty_eh_cleanup): New function.
+	(find_tail_calls): Diagnose throwing of exceptions which do not
+	propagate only if there are no EDGE_EH successor edges.  If there are
+	and the call is musttail, use empty_eh_cleanup to find if the cleanup
+	is not empty.  If not or the call is not musttail, use different
+	diagnostics.  Set is_noreturn even if there are successor edges.  Use
+	find_fallthru_edge (abb->succs) instead of single_succ_edge (abb).
+	(decrease_profile): Don't assert 0 or 1 successor edges.
+	(eliminate_tail_call): Use
+	find_fallthru_edge (gsi_bb (t->call_gsi)->succs) instead of
+	single_succ_edge (gsi_bb (t->call_gsi)).
+	(tree_optimize_tail_calls_1): Also look into basic blocks with
+	single succ edge which is EDGE_EH for noreturn musttail calls.
+
+	* g++.dg/opt/musttail3.C: New test.
+	* g++.dg/opt/musttail4.C: New test.
+	* g++.dg/opt/musttail5.C: New test.
+diff --git a/gcc/testsuite/g++.dg/opt/musttail3.C b/gcc/testsuite/g++.dg/opt/musttail3.C
+new file mode 100644
+index 000000000000..1c4e54952b1e
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/musttail3.C
+@@ -0,0 +1,41 @@
++// PR tree-optimization/119491
++// { dg-do compile { target { external_musttail && c++11 } } }
++// { dg-options "-O2" }
++
++struct A {
++  struct B {};
++  A () {}
++};
++void qux ();
++unsigned char v;
++A w;
++void foo (A);
++
++template <typename T>
++[[gnu::always_inline]] static inline void
++bar (int &)
++{
++}
++
++[[gnu::always_inline]] static inline void
++baz (int *)
++{
++  int r = 0;
++  bar<int> (r);
++}
++
++[[gnu::always_inline]] inline void
++corge (A)
++{
++  if (v)
++    qux ();
++  [[gnu::musttail]] return foo (w);
++}
++
++void
++freddy (A)
++{
++  int t;
++  baz (&t);
++  [[gnu::musttail]] return corge (A{});
++}
+diff --git a/gcc/testsuite/g++.dg/opt/musttail4.C b/gcc/testsuite/g++.dg/opt/musttail4.C
+new file mode 100644
+index 000000000000..ede2959f7d74
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/musttail4.C
+@@ -0,0 +1,35 @@
++// { dg-do compile { target { external_musttail && c++11 } } }
++// { dg-options "-O2 -fexceptions" }
++
++struct S { ~S (); };
++volatile int v;
++struct T { ~T () { v = v + 1; } };
++struct U { ~U () {} };
++int foo ();
++
++int
++bar () noexcept
++{
++  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: call may throw exception that does not propagate" }
++}
++
++int
++baz ()
++{
++  S s;
++  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: other reasons" }
++}
++
++int
++qux ()
++{
++  T t;
++  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: other reasons" }
++}
++
++int
++corge ()
++{
++  U u;
++  [[gnu::musttail]] return foo ();
++}
+diff --git a/gcc/testsuite/g++.dg/opt/musttail5.C b/gcc/testsuite/g++.dg/opt/musttail5.C
+new file mode 100644
+index 000000000000..604dd6907aa9
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/musttail5.C
+@@ -0,0 +1,41 @@
++// PR tree-optimization/119491
++// { dg-do compile { target { external_musttail && c++11 } } }
++// { dg-options "-O2" }
++
++struct A {
++  struct B {};
++  A () {}
++};
++void qux ();
++unsigned char v;
++A w;
++[[noreturn]] void foo (A);
++
++template <typename T>
++[[gnu::always_inline]] static inline void
++bar (int &)
++{
++}
++
++[[gnu::always_inline]] static inline void
++baz (int *)
++{
++  int r = 0;
++  bar<int> (r);
++}
++
++[[gnu::always_inline]] inline void
++corge (A)
++{
++  if (v)
++    qux ();
++  [[gnu::musttail]] return foo (w);
++}
++
++void
++freddy (A)
++{
++  int t;
++  baz (&t);
++  [[gnu::musttail]] return corge (A{});
++}
+diff --git a/gcc/tree-tailcall.cc b/gcc/tree-tailcall.cc
+index e71341bfb2bc..b910dce7acbd 100644
+--- a/gcc/tree-tailcall.cc
++++ b/gcc/tree-tailcall.cc
+@@ -245,7 +245,7 @@ independent_of_stmt_p (tree expr, gimple *at, gimple_stmt_iterator gsi,
+   /* Mark the blocks in the chain leading to the end.  */
+   at_bb = gimple_bb (at);
+   call_bb = gimple_bb (gsi_stmt (gsi));
+-  for (bb = call_bb; bb != at_bb; bb = single_succ (bb))
++  for (bb = call_bb; bb != at_bb; bb = find_fallthru_edge (bb->succs)->dest)
+     bb->aux = &bb->aux;
+   bb->aux = &bb->aux;
+ 
+@@ -289,7 +289,7 @@ independent_of_stmt_p (tree expr, gimple *at, gimple_stmt_iterator gsi,
+     }
+ 
+   /* Unmark the blocks.  */
+-  for (bb = call_bb; bb != at_bb; bb = single_succ (bb))
++  for (bb = call_bb; bb != at_bb; bb = find_fallthru_edge (bb->succs)->dest)
+     bb->aux = NULL;
+   bb->aux = NULL;
+ 
+@@ -462,6 +462,33 @@ maybe_error_musttail (gcall *call, const char *err, bool diag_musttail)
+     }
+ }
+ 
++/* Return true if there is no real work performed in the exception
++   path starting at BB and it will in the end result in external exception.
++   Search at most CNT basic blocks (so that we don't need to do trivial
++   loop discovery).  */
++static bool
++empty_eh_cleanup (basic_block bb, int cnt)
++{
++  if (EDGE_COUNT (bb->succs) > 1)
++    return false;
++
++  for (gimple_stmt_iterator gsi = gsi_after_labels (bb); !gsi_end_p (gsi);
++       gsi_next (&gsi))
++    {
++      gimple *g = gsi_stmt (gsi);
++      if (is_gimple_debug (g) || gimple_clobber_p (g))
++	continue;
++      if (is_gimple_resx (g) && stmt_can_throw_external (cfun, g))
++	return true;
++      return false;
++    }
++  if (!single_succ_p (bb))
++    return false;
++  if (cnt == 1)
++    return false;
++  return empty_eh_cleanup (single_succ (bb), cnt - 1);
++}
++
+ /* Argument for compute_live_vars/live_vars_at_stmt and what compute_live_vars
+    returns.  Computed lazily, but just once for the function.  */
+ static live_vars_map *live_vars;
+@@ -612,14 +639,35 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
+   if ((stmt_could_throw_p (cfun, stmt)
+        && !stmt_can_throw_external (cfun, stmt)) || EDGE_COUNT (bb->succs) > 1)
+   {
+-    if (stmt == last_stmt)
+-      maybe_error_musttail (call,
+-			    _("call may throw exception that does not "
+-			      "propagate"), diag_musttail);
+-    else
+-      maybe_error_musttail (call, _("code between call and return"),
+-			    diag_musttail);
+-    return;
++    if (stmt != last_stmt)
++      {
++	maybe_error_musttail (call, _("code between call and return"),
++			      diag_musttail);
++	return;
++      }
++
++    edge e;
++    edge_iterator ei;
++    FOR_EACH_EDGE (e, ei, bb->succs)
++      if (e->flags & EDGE_EH)
++	break;
++
++    if (!e)
++      {
++	maybe_error_musttail (call,
++			      _("call may throw exception that does not "
++				"propagate"), diag_musttail);
++	return;
++      }
++
++    if (!gimple_call_must_tail_p (call)
++	|| !empty_eh_cleanup (e->dest, 20))
++      {
++	maybe_error_musttail (call,
++			      _("call may throw exception caught locally "
++				"or perform cleanups"), diag_musttail);
++	return;
++      }
+   }
+ 
+   /* If the function returns a value, then at present, the tail call
+@@ -763,8 +811,7 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
+   a = NULL_TREE;
+   auto_bitmap to_move_defs;
+   auto_vec<gimple *> to_move_stmts;
+-  bool is_noreturn
+-    = EDGE_COUNT (bb->succs) == 0 && gimple_call_noreturn_p (call);
++  bool is_noreturn = gimple_call_noreturn_p (call);
+ 
+   abb = bb;
+   agsi = gsi;
+@@ -776,8 +823,9 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
+ 
+       while (gsi_end_p (agsi))
+ 	{
+-	  ass_var = propagate_through_phis (ass_var, single_succ_edge (abb));
+-	  abb = single_succ (abb);
++	  edge e = find_fallthru_edge (abb->succs);
++	  ass_var = propagate_through_phis (ass_var, e);
++	  abb = e->dest;
+ 	  agsi = gsi_start_bb (abb);
+ 	}
+ 
+@@ -1112,11 +1160,6 @@ static void
+ decrease_profile (basic_block bb, profile_count count)
+ {
+   bb->count = bb->count - count;
+-  if (!single_succ_p (bb))
+-    {
+-      gcc_assert (!EDGE_COUNT (bb->succs));
+-      return;
+-    }
+ }
+ 
+ /* Eliminates tail call described by T.  TMP_VARS is a list of
+@@ -1181,7 +1224,7 @@ eliminate_tail_call (struct tailcall *t, class loop *&new_loop)
+   else
+     {
+       /* Number of executions of function has reduced by the tailcall.  */
+-      e = single_succ_edge (gsi_bb (t->call_gsi));
++      e = find_fallthru_edge (gsi_bb (t->call_gsi)->succs);
+ 
+       profile_count count = e->count ();
+ 
+@@ -1196,8 +1239,7 @@ eliminate_tail_call (struct tailcall *t, class loop *&new_loop)
+ 	decrease_profile (e->dest, count);
+ 
+       /* Replace the call by a jump to the start of function.  */
+-      e = redirect_edge_and_branch (single_succ_edge (gsi_bb (t->call_gsi)),
+-				    first);
++      e = redirect_edge_and_branch (e, first);
+     }
+   gcc_assert (e);
+   PENDING_STMT (e) = NULL;
+@@ -1362,7 +1404,9 @@ tree_optimize_tail_calls_1 (bool opt_tailcalls, bool only_musttail,
+     {
+       basic_block bb;
+       FOR_EACH_BB_FN (bb, cfun)
+-	if (EDGE_COUNT (bb->succs) == 0)
++	if (EDGE_COUNT (bb->succs) == 0
++	    || (single_succ_p (bb)
++		&& (single_succ_edge (bb)->flags & EDGE_EH)))
+ 	  if (gimple *c = last_nondebug_stmt (bb))
+ 	    if (is_gimple_call (c)
+ 		&& gimple_call_must_tail_p (as_a <gcall *> (c))
