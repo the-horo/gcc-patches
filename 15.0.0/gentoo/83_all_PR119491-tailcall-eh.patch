@@ -1,6 +1,38 @@
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
+https://inbox.sourceware.org/gcc-patches/Z+1hCrznhv68Sv4J@tucnak/
 
-2025-04-01  Jakub Jelinek  <jakub@redhat.com>
+From e561af4c75ca62ae9363700531e60cc5793a88b3 Mon Sep 17 00:00:00 2001
+Message-ID: <e561af4c75ca62ae9363700531e60cc5793a88b3.1743610408.git.sam@gentoo.org>
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 2 Apr 2025 18:08:42 +0200
+Subject: [PATCH] tailc: Deal with trivially useless EH cleanups [PR119491]
+
+Hi!
+
+The following testcases FAIL, because EH cleanup is performed only before
+IPA and then right before musttail pass.
+At -O2 etc. (except for -O0/-Og) we handle musttail calls in the tailc
+pass though, and we can fail at that point because the calls might appear
+to throw internal exceptions which just don't do anything interesting
+(perhaps have debug statements or clobber statements in them) before they
+continue with resume of the exception (i.e. throw it externally).
+
+As Richi said in the PR (and I agree) that moving passes is risky at this
+point, the following patch instead teaches the tail{r,c} and musttail
+passes to deal with such extra EDGE_EH edges.
+
+It is fairly simple thing, if we see an EDGE_EH edge from the call we
+just look up where it lands and if there are no
+non-debug/non-clobber/non-label statements before resx which throws
+externally, such edge can be ignored for tail call optimization or
+tail recursion.  At other spots I just need to avoid using
+single_succ/single_succ_edge because the bb might have another edge -
+EDGE_EH.
+
+To make this less risky, this is done solely for the musttail calls for now.
+
+Bootstrapped/regtested on x86_64-linux and i686-linux, ok for trunk?
+
+2025-04-02  Jakub Jelinek  <jakub@redhat.com>
 
 	PR tree-optimization/119491
 	* tree-tailcall.cc (single_non_eh_succ_edge): New function.
@@ -24,10 +56,156 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
 	* g++.dg/opt/musttail3.C: New test.
 	* g++.dg/opt/musttail4.C: New test.
 	* g++.dg/opt/musttail5.C: New test.
+---
+ gcc/testsuite/g++.dg/opt/musttail3.C |  41 ++++++++++
+ gcc/testsuite/g++.dg/opt/musttail4.C |  35 +++++++++
+ gcc/testsuite/g++.dg/opt/musttail5.C |  41 ++++++++++
+ gcc/tree-tailcall.cc                 | 113 +++++++++++++++++++++------
+ 4 files changed, 207 insertions(+), 23 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/opt/musttail3.C
+ create mode 100644 gcc/testsuite/g++.dg/opt/musttail4.C
+ create mode 100644 gcc/testsuite/g++.dg/opt/musttail5.C
 
---- a/gcc/tree-tailcall.cc	2025-04-01 16:47:30.373502796 +0200
-+++ b/gcc/tree-tailcall.cc	2025-04-02 09:02:35.572760732 +0200
-@@ -219,6 +219,23 @@ suitable_for_tail_call_opt_p (gcall *cal
+diff --git a/gcc/testsuite/g++.dg/opt/musttail3.C b/gcc/testsuite/g++.dg/opt/musttail3.C
+new file mode 100644
+index 000000000000..1c4e54952b1e
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/musttail3.C
+@@ -0,0 +1,41 @@
++// PR tree-optimization/119491
++// { dg-do compile { target { external_musttail && c++11 } } }
++// { dg-options "-O2" }
++
++struct A {
++  struct B {};
++  A () {}
++};
++void qux ();
++unsigned char v;
++A w;
++void foo (A);
++
++template <typename T>
++[[gnu::always_inline]] static inline void
++bar (int &)
++{
++}
++
++[[gnu::always_inline]] static inline void
++baz (int *)
++{
++  int r = 0;
++  bar<int> (r);
++}
++
++[[gnu::always_inline]] inline void
++corge (A)
++{
++  if (v)
++    qux ();
++  [[gnu::musttail]] return foo (w);
++}
++
++void
++freddy (A)
++{
++  int t;
++  baz (&t);
++  [[gnu::musttail]] return corge (A{});
++}
+diff --git a/gcc/testsuite/g++.dg/opt/musttail4.C b/gcc/testsuite/g++.dg/opt/musttail4.C
+new file mode 100644
+index 000000000000..ede2959f7d74
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/musttail4.C
+@@ -0,0 +1,35 @@
++// { dg-do compile { target { external_musttail && c++11 } } }
++// { dg-options "-O2 -fexceptions" }
++
++struct S { ~S (); };
++volatile int v;
++struct T { ~T () { v = v + 1; } };
++struct U { ~U () {} };
++int foo ();
++
++int
++bar () noexcept
++{
++  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: call may throw exception that does not propagate" }
++}
++
++int
++baz ()
++{
++  S s;
++  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: other reasons" }
++}
++
++int
++qux ()
++{
++  T t;
++  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: other reasons" }
++}
++
++int
++corge ()
++{
++  U u;
++  [[gnu::musttail]] return foo ();
++}
+diff --git a/gcc/testsuite/g++.dg/opt/musttail5.C b/gcc/testsuite/g++.dg/opt/musttail5.C
+new file mode 100644
+index 000000000000..604dd6907aa9
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/musttail5.C
+@@ -0,0 +1,41 @@
++// PR tree-optimization/119491
++// { dg-do compile { target { external_musttail && c++11 } } }
++// { dg-options "-O2" }
++
++struct A {
++  struct B {};
++  A () {}
++};
++void qux ();
++unsigned char v;
++A w;
++[[noreturn]] void foo (A);
++
++template <typename T>
++[[gnu::always_inline]] static inline void
++bar (int &)
++{
++}
++
++[[gnu::always_inline]] static inline void
++baz (int *)
++{
++  int r = 0;
++  bar<int> (r);
++}
++
++[[gnu::always_inline]] inline void
++corge (A)
++{
++  if (v)
++    qux ();
++  [[gnu::musttail]] return foo (w);
++}
++
++void
++freddy (A)
++{
++  int t;
++  baz (&t);
++  [[gnu::musttail]] return corge (A{});
++}
+diff --git a/gcc/tree-tailcall.cc b/gcc/tree-tailcall.cc
+index 374be2ae6a75..477729ca2137 100644
+--- a/gcc/tree-tailcall.cc
++++ b/gcc/tree-tailcall.cc
+@@ -253,6 +253,23 @@ suitable_for_tail_call_opt_p (gcall *call, bool diag_musttail)
    return true;
  }
  
@@ -51,7 +229,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
  /* Checks whether the expression EXPR in stmt AT is independent of the
     statement pointed to by GSI (in a sense that we already know EXPR's value
     at GSI).  We use the fact that we are only called from the chain of
-@@ -245,7 +262,7 @@ independent_of_stmt_p (tree expr, gimple
+@@ -279,7 +296,7 @@ independent_of_stmt_p (tree expr, gimple *at, gimple_stmt_iterator gsi,
    /* Mark the blocks in the chain leading to the end.  */
    at_bb = gimple_bb (at);
    call_bb = gimple_bb (gsi_stmt (gsi));
@@ -60,7 +238,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
      bb->aux = &bb->aux;
    bb->aux = &bb->aux;
  
-@@ -289,7 +306,7 @@ independent_of_stmt_p (tree expr, gimple
+@@ -323,7 +340,7 @@ independent_of_stmt_p (tree expr, gimple *at, gimple_stmt_iterator gsi,
      }
  
    /* Unmark the blocks.  */
@@ -69,7 +247,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
      bb->aux = NULL;
    bb->aux = NULL;
  
-@@ -462,6 +479,33 @@ maybe_error_musttail (gcall *call, const
+@@ -496,6 +513,33 @@ maybe_error_musttail (gcall *call, const char *err, bool diag_musttail)
      }
  }
  
@@ -103,7 +281,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
  /* Argument for compute_live_vars/live_vars_at_stmt and what compute_live_vars
     returns.  Computed lazily, but just once for the function.  */
  static live_vars_map *live_vars;
-@@ -612,14 +656,36 @@ find_tail_calls (basic_block bb, struct
+@@ -646,14 +690,36 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
    if ((stmt_could_throw_p (cfun, stmt)
         && !stmt_can_throw_external (cfun, stmt)) || EDGE_COUNT (bb->succs) > 1)
    {
@@ -148,7 +326,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
    }
  
    /* If the function returns a value, then at present, the tail call
-@@ -763,8 +829,7 @@ find_tail_calls (basic_block bb, struct
+@@ -844,8 +910,7 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
    a = NULL_TREE;
    auto_bitmap to_move_defs;
    auto_vec<gimple *> to_move_stmts;
@@ -158,7 +336,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
  
    abb = bb;
    agsi = gsi;
-@@ -776,8 +841,9 @@ find_tail_calls (basic_block bb, struct
+@@ -857,8 +922,9 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
  
        while (gsi_end_p (agsi))
  	{
@@ -170,7 +348,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
  	  agsi = gsi_start_bb (abb);
  	}
  
-@@ -851,6 +917,11 @@ find_tail_calls (basic_block bb, struct
+@@ -932,6 +998,11 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
    /* See if this is a tail call we can handle.  */
    if (is_noreturn)
      {
@@ -182,7 +360,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
        tree rettype = TREE_TYPE (TREE_TYPE (current_function_decl));
        tree calltype = TREE_TYPE (gimple_call_fntype (call));
        if (!VOID_TYPE_P (rettype)
-@@ -1112,11 +1183,6 @@ static void
+@@ -1193,11 +1264,6 @@ static void
  decrease_profile (basic_block bb, profile_count count)
  {
    bb->count = bb->count - count;
@@ -194,7 +372,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
  }
  
  /* Eliminates tail call described by T.  TMP_VARS is a list of
-@@ -1181,7 +1247,7 @@ eliminate_tail_call (struct tailcall *t,
+@@ -1262,7 +1328,7 @@ eliminate_tail_call (struct tailcall *t, class loop *&new_loop)
    else
      {
        /* Number of executions of function has reduced by the tailcall.  */
@@ -203,7 +381,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
  
        profile_count count = e->count ();
  
-@@ -1196,8 +1262,7 @@ eliminate_tail_call (struct tailcall *t,
+@@ -1277,8 +1343,7 @@ eliminate_tail_call (struct tailcall *t, class loop *&new_loop)
  	decrease_profile (e->dest, count);
  
        /* Replace the call by a jump to the start of function.  */
@@ -213,7 +391,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
      }
    gcc_assert (e);
    PENDING_STMT (e) = NULL;
-@@ -1362,7 +1427,9 @@ tree_optimize_tail_calls_1 (bool opt_tai
+@@ -1443,7 +1508,9 @@ tree_optimize_tail_calls_1 (bool opt_tailcalls, bool only_musttail,
      {
        basic_block bb;
        FOR_EACH_BB_FN (bb, cfun)
@@ -224,129 +402,8 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119491#c5
  	  if (gimple *c = last_nondebug_stmt (bb))
  	    if (is_gimple_call (c)
  		&& gimple_call_must_tail_p (as_a <gcall *> (c))
---- a/gcc/testsuite/g++.dg/opt/musttail3.C	2025-04-01 18:47:10.474945080 +0200
-+++ b/gcc/testsuite/g++.dg/opt/musttail3.C	2025-04-01 18:49:27.063068029 +0200
-@@ -0,0 +1,41 @@
-+// PR tree-optimization/119491
-+// { dg-do compile { target { external_musttail && c++11 } } }
-+// { dg-options "-O2" }
-+
-+struct A {
-+  struct B {};
-+  A () {}
-+};
-+void qux ();
-+unsigned char v;
-+A w;
-+void foo (A);
-+
-+template <typename T>
-+[[gnu::always_inline]] static inline void
-+bar (int &)
-+{
-+}
-+
-+[[gnu::always_inline]] static inline void
-+baz (int *)
-+{
-+  int r = 0;
-+  bar<int> (r);
-+}
-+
-+[[gnu::always_inline]] inline void
-+corge (A)
-+{
-+  if (v)
-+    qux ();
-+  [[gnu::musttail]] return foo (w);
-+}
-+
-+void
-+freddy (A)
-+{
-+  int t;
-+  baz (&t);
-+  [[gnu::musttail]] return corge (A{});
-+}
---- a/gcc/testsuite/g++.dg/opt/musttail4.C	2025-04-01 19:10:56.389350911 +0200
-+++ b/gcc/testsuite/g++.dg/opt/musttail4.C	2025-04-01 19:28:18.285020409 +0200
-@@ -0,0 +1,35 @@
-+// { dg-do compile { target { external_musttail && c++11 } } }
-+// { dg-options "-O2 -fexceptions" }
-+
-+struct S { ~S (); };
-+volatile int v;
-+struct T { ~T () { v = v + 1; } };
-+struct U { ~U () {} };
-+int foo ();
-+
-+int
-+bar () noexcept
-+{
-+  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: call may throw exception that does not propagate" }
-+}
-+
-+int
-+baz ()
-+{
-+  S s;
-+  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: other reasons" }
-+}
-+
-+int
-+qux ()
-+{
-+  T t;
-+  [[gnu::musttail]] return foo ();	// { dg-error "cannot tail-call: other reasons" }
-+}
-+
-+int
-+corge ()
-+{
-+  U u;
-+  [[gnu::musttail]] return foo ();
-+}
---- a/gcc/testsuite/g++.dg/opt/musttail5.C	2025-04-01 19:14:50.981127712 +0200
-+++ b/gcc/testsuite/g++.dg/opt/musttail5.C	2025-04-01 19:11:25.249954382 +0200
-@@ -0,0 +1,41 @@
-+// PR tree-optimization/119491
-+// { dg-do compile { target { external_musttail && c++11 } } }
-+// { dg-options "-O2" }
-+
-+struct A {
-+  struct B {};
-+  A () {}
-+};
-+void qux ();
-+unsigned char v;
-+A w;
-+[[noreturn]] void foo (A);
-+
-+template <typename T>
-+[[gnu::always_inline]] static inline void
-+bar (int &)
-+{
-+}
-+
-+[[gnu::always_inline]] static inline void
-+baz (int *)
-+{
-+  int r = 0;
-+  bar<int> (r);
-+}
-+
-+[[gnu::always_inline]] inline void
-+corge (A)
-+{
-+  if (v)
-+    qux ();
-+  [[gnu::musttail]] return foo (w);
-+}
-+
-+void
-+freddy (A)
-+{
-+  int t;
-+  baz (&t);
-+  [[gnu::musttail]] return corge (A{});
-+}
+
+base-commit: aca8155c09001f269a20d6df438fa0e749dd5388
+-- 
+2.49.0
+
