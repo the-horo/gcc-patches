@@ -1,0 +1,240 @@
+https://inbox.sourceware.org/gcc-patches/mptecy8xowo.fsf@arm.com/
+
+From 247ac81832821bade9fa36c350d220dca039d383 Mon Sep 17 00:00:00 2001
+Message-ID: <247ac81832821bade9fa36c350d220dca039d383.1743793443.git.sam@gentoo.org>
+In-Reply-To: <de2f5e9c4ce4bb674fb0da191102838a6bdd92f6.1743793443.git.sam@gentoo.org>
+References: <de2f5e9c4ce4bb674fb0da191102838a6bdd92f6.1743793443.git.sam@gentoo.org>
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Fri, 4 Apr 2025 10:23:00 +0100
+Subject: [PATCH 4/4] combine: Limit insn searchs for 2->2 combinations
+ [PR116398]
+
+As noted in the previous patch, combine still takes >30% of
+compile time in the original testcase for PR101523.  The problem
+is that try_combine uses linear insn searches for some dataflow
+queries, so in the worst case, an unlimited number of 2->2
+combinations for the same i2 can lead to quadratic behaviour.
+
+This patch limits distribute_links to a certain number
+of instructions when i2 is unchanged.  As Segher said in the PR trail,
+it would make more conceptual sense to apply the limit unconditionally,
+but I thought it would be better to change as little as possible at
+this development stage.  Logically, in stage 1, the --param should
+be applied directly by distribute_links with no input from callers.
+
+As I mentioned in:
+
+  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116398#c28
+
+I think it's safe to drop log links even if a use exists.  All
+processing of log links seems to handle the absence of a link
+for a particular register in a conservative way.
+
+The initial set-up errs on the side of dropping links, since for example
+create_log_links has:
+
+             /* flow.c claimed:
+
+                 We don't build a LOG_LINK for hard registers contained
+                 in ASM_OPERANDs.  If these registers get replaced,
+                 we might wind up changing the semantics of the insn,
+                 even if reload can make what appear to be valid
+                 assignments later.  */
+              if (regno < FIRST_PSEUDO_REGISTER
+                  && asm_noperands (PATTERN (use_insn)) >= 0)
+                continue;
+
+which excludes combinations by dropping log links, rather than during
+try_combine.  And:
+
+      /* If this register is being initialized using itself, and the
+         register is uninitialized in this basic block, and there are
+         no LOG_LINKS which set the register, then part of the
+         register is uninitialized.  In that case we can't assume
+         anything about the number of nonzero bits.
+
+         ??? We could do better if we checked this in
+         reg_{nonzero_bits,num_sign_bit_copies}_for_combine.  Then we
+         could avoid making assumptions about the insn which initially
+         sets the register, while still using the information in other
+         insns.  We would have to be careful to check every insn
+         involved in the combination.  */
+
+      if (insn
+          && reg_referenced_p (x, PATTERN (insn))
+          && !REGNO_REG_SET_P (DF_LR_IN (BLOCK_FOR_INSN (insn)),
+                               REGNO (x)))
+        {
+          struct insn_link *link;
+
+          FOR_EACH_LOG_LINK (link, insn)
+            if (dead_or_set_p (link->insn, x))
+              break;
+          if (!link)
+            {
+              rsp->nonzero_bits = GET_MODE_MASK (mode);
+              rsp->sign_bit_copies = 1;
+              return;
+            }
+        }
+
+treats the lack of a log link as a possible sign of uninitialised data,
+but that would be a missed optimisation rather than a correctness issue.
+
+One question is what the default --param value should be.  I went with
+Jakub's suggestion of 3000 from:
+
+  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116398#c25
+
+Also, to answer Jakub's question in that comment, I tried bisecting:
+
+  int limit = atoi (getenv ("BISECT"));
+
+(so applying the limit for all calls from try_combine) with an
+abort in distribute_links if the limit caused a link to be skipped.
+The minimum BISECT value that allowed an aarch64-linux-gnu bootstrap
+to succeed with --enable-languages=all --enable-checking=yes,rtl,extra
+was 142, so much lower than the parameter value.  I realised too late
+that --enable-checking=release would probably have been a more
+interesting test.
+
+The previous patch meant that distribute_links itself is now linear
+for a given i2 definition, since each search starts at the previous
+last use, rather than at i2 itself.  This means that the limit has
+to be applied cumulatively across all searches for the same link.
+
+The patch does that by storing a counter in the insn_link structure.
+There was a 32-bit hole there on LP64 hosts.
+
+gcc/
+	PR testsuite/116398
+	* params.opt (-param=max-combine-search-insns=): New param.
+	* doc/invoke.texi: Document it.
+	* combine.cc (insn_link::insn_count): New field.
+	(alloc_insn_link): Initialize it.
+	(distribute_links): Add a limit parameter.
+	(try_combine): Use the new param to limit distribute_links
+	when only i3 has changed.
+---
+ gcc/combine.cc      | 21 +++++++++++++++++----
+ gcc/doc/invoke.texi |  9 +++++++++
+ gcc/params.opt      |  4 ++++
+ 3 files changed, 30 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/combine.cc b/gcc/combine.cc
+index e99b064c98d4..5f085187cfef 100644
+--- a/gcc/combine.cc
++++ b/gcc/combine.cc
+@@ -309,6 +309,7 @@ static int *uid_insn_cost;
+ struct insn_link {
+   rtx_insn *insn;
+   unsigned int regno;
++  int insn_count;
+   struct insn_link *next;
+ };
+ 
+@@ -342,6 +343,7 @@ alloc_insn_link (rtx_insn *insn, unsigned int regno, struct insn_link *next)
+ 					  sizeof (struct insn_link));
+   l->insn = insn;
+   l->regno = regno;
++  l->insn_count = 0;
+   l->next = next;
+   return l;
+ }
+@@ -472,7 +474,8 @@ static void move_deaths (rtx, rtx, int, rtx_insn *, rtx *);
+ static bool reg_bitfield_target_p (rtx, rtx);
+ static void distribute_notes (rtx, rtx_insn *, rtx_insn *, rtx_insn *,
+ 			      rtx, rtx, rtx);
+-static void distribute_links (struct insn_link *, rtx_insn * = nullptr);
++static void distribute_links (struct insn_link *, rtx_insn * = nullptr,
++			      int limit = INT_MAX);
+ static void mark_used_regs_combine (rtx);
+ static void record_promoted_value (rtx_insn *, rtx);
+ static bool unmentioned_reg_p (rtx, rtx);
+@@ -4593,7 +4596,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
+       }
+ 
+     if (only_i3_changed)
+-      distribute_links (i3links, i3);
++      distribute_links (i3links, i3, param_max_combine_search_insns);
+     else
+       {
+ 	distribute_links (i3links);
+@@ -14994,10 +14997,12 @@ distribute_notes (rtx notes, rtx_insn *from_insn, rtx_insn *i3, rtx_insn *i2,
+    pointing at I3 when I3's destination is changed.
+ 
+    If START is nonnull and an insn, we know that the next location for each
+-   link is no earlier than START.  */
++   link is no earlier than START.  LIMIT is the maximum number of nondebug
++   instructions that can be scanned when looking for the next use of a
++   definition.  */
+ 
+ static void
+-distribute_links (struct insn_link *links, rtx_insn *start)
++distribute_links (struct insn_link *links, rtx_insn *start, int limit)
+ {
+   struct insn_link *link, *next_link;
+ 
+@@ -15063,9 +15068,12 @@ distribute_links (struct insn_link *links, rtx_insn *start)
+ 	 I3 to I2.  Also note that not much searching is typically done here
+ 	 since most links don't point very far away.  */
+ 
++      int count = 0;
+       insn = start;
+       if (!insn || NOTE_P (insn))
+ 	insn = NEXT_INSN (link->insn);
++      else
++	count = link->insn_count;
+       for (;
+ 	   (insn && (this_basic_block->next_bb == EXIT_BLOCK_PTR_FOR_FN (cfun)
+ 		     || BB_HEAD (this_basic_block->next_bb) != insn));
+@@ -15086,6 +15094,11 @@ distribute_links (struct insn_link *links, rtx_insn *start)
+ 	  }
+ 	else if (INSN_P (insn) && reg_set_p (reg, insn))
+ 	  break;
++	else if (count >= limit)
++	  break;
++	else
++	  count += 1;
++      link->insn_count = count;
+ 
+       /* If we found a place to put the link, place it there unless there
+ 	 is already a link to the same insn as LINK at that point.  */
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index 4c9af429ab08..0903cd2b7f23 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -16518,6 +16518,15 @@ in combiner for a pseudo register as last known value of that register.
+ @item max-combine-insns
+ The maximum number of instructions the RTL combiner tries to combine.
+ 
++@item max-combine-search-insns
++The maximum number of instructions that the RTL combiner searches in order
++to find the next use of a given register definition.  If this limit is reached
++without finding such a use, the combiner will stop trying to optimize the
++definition.
++
++Currently this limit only applies after certain successful combination
++attempts, but it could be extended to other cases in future.
++
+ @item integer-share-limit
+ Small integer constants can use a shared data structure, reducing the
+ compiler's memory usage and increasing its speed.  This sets the maximum
+diff --git a/gcc/params.opt b/gcc/params.opt
+index 4f4eb4d7a2a5..422d082b3557 100644
+--- a/gcc/params.opt
++++ b/gcc/params.opt
+@@ -477,6 +477,10 @@ The maximum number of instructions to consider to unroll in a loop on average.
+ Common Joined UInteger Var(param_max_combine_insns) Init(4) IntegerRange(2, 4) Param Optimization
+ The maximum number of insns combine tries to combine.
+ 
++-param=max-combine-search-insns=
++Common Joined UInteger Var(param_max_combine_search_insns) Init(3000) Param Optimization
++The maximum number of instructions that combine searches in order to find the next use of a particular register.
++
+ -param=max-completely-peel-loop-nest-depth=
+ Common Joined UInteger Var(param_max_unroll_iterations) Init(8) Param Optimization
+ The maximum depth of a loop nest we completely peel.
+-- 
+2.49.0
+

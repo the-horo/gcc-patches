@@ -1,0 +1,99 @@
+https://inbox.sourceware.org/gcc-patches/mptecy8xowo.fsf@arm.com/
+
+From bc27a2f371602bf897ff4da1620a56eeeeebf8ff Mon Sep 17 00:00:00 2001
+Message-ID: <bc27a2f371602bf897ff4da1620a56eeeeebf8ff.1743793443.git.sam@gentoo.org>
+In-Reply-To: <de2f5e9c4ce4bb674fb0da191102838a6bdd92f6.1743793443.git.sam@gentoo.org>
+References: <de2f5e9c4ce4bb674fb0da191102838a6bdd92f6.1743793443.git.sam@gentoo.org>
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Fri, 4 Apr 2025 10:22:32 +0100
+Subject: [PATCH 3/4] combine: Optimise distribute_links search [PR116398]
+
+Another problem in PR101523 was that, after each successful 2->2
+combination attempt, distribute_links would search further and further
+for the next combinable use of the i2 destination.  Each search would
+start at i2 itself, making the search quadratic in the worst case.
+
+In a 2->2 combination, if i2 is unchanged, the search can start at i3
+instead of i2.  The same thing applies to i2 when distributing i2's
+links, since the only changes to earlier instructions are the deletion
+of i0 and i1.
+
+This change, combined with the previous split_i2i3 patch, gives a
+34.6% speedup in combine for the testcase in PR101523.  Combine
+goes from being 41% to 34% of compile time.
+
+gcc/
+	PR testsuite/116398
+	* combine.cc (distribute_links): Take an optional start point.
+	(try_combine): If only i3 has changed, only distribute i3's links,
+	not i2's.  Start the search for the new use from i3 rather than
+	from the definition instruction.  Likewise start the search for
+	the new use from i2 when distributing i2's links.
+---
+ gcc/combine.cc | 27 +++++++++++++++++++--------
+ 1 file changed, 19 insertions(+), 8 deletions(-)
+
+diff --git a/gcc/combine.cc b/gcc/combine.cc
+index e29cff7147d9..e99b064c98d4 100644
+--- a/gcc/combine.cc
++++ b/gcc/combine.cc
+@@ -472,7 +472,7 @@ static void move_deaths (rtx, rtx, int, rtx_insn *, rtx *);
+ static bool reg_bitfield_target_p (rtx, rtx);
+ static void distribute_notes (rtx, rtx_insn *, rtx_insn *, rtx_insn *,
+ 			      rtx, rtx, rtx);
+-static void distribute_links (struct insn_link *);
++static void distribute_links (struct insn_link *, rtx_insn * = nullptr);
+ static void mark_used_regs_combine (rtx);
+ static void record_promoted_value (rtx_insn *, rtx);
+ static bool unmentioned_reg_p (rtx, rtx);
+@@ -4592,10 +4592,15 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
+ 			    NULL_RTX, NULL_RTX, NULL_RTX);
+       }
+ 
+-    distribute_links (i3links);
+-    distribute_links (i2links);
+-    distribute_links (i1links);
+-    distribute_links (i0links);
++    if (only_i3_changed)
++      distribute_links (i3links, i3);
++    else
++      {
++	distribute_links (i3links);
++	distribute_links (i2links, i2);
++	distribute_links (i1links);
++	distribute_links (i0links);
++      }
+ 
+     if (REG_P (i2dest))
+       {
+@@ -14986,10 +14991,13 @@ distribute_notes (rtx notes, rtx_insn *from_insn, rtx_insn *i3, rtx_insn *i2,
+ 
+ /* Similarly to above, distribute the LOG_LINKS that used to be present on
+    I3, I2, and I1 to new locations.  This is also called to add a link
+-   pointing at I3 when I3's destination is changed.  */
++   pointing at I3 when I3's destination is changed.
++
++   If START is nonnull and an insn, we know that the next location for each
++   link is no earlier than START.  */
+ 
+ static void
+-distribute_links (struct insn_link *links)
++distribute_links (struct insn_link *links, rtx_insn *start)
+ {
+   struct insn_link *link, *next_link;
+ 
+@@ -15055,7 +15063,10 @@ distribute_links (struct insn_link *links)
+ 	 I3 to I2.  Also note that not much searching is typically done here
+ 	 since most links don't point very far away.  */
+ 
+-      for (insn = NEXT_INSN (link->insn);
++      insn = start;
++      if (!insn || NOTE_P (insn))
++	insn = NEXT_INSN (link->insn);
++      for (;
+ 	   (insn && (this_basic_block->next_bb == EXIT_BLOCK_PTR_FOR_FN (cfun)
+ 		     || BB_HEAD (this_basic_block->next_bb) != insn));
+ 	   insn = NEXT_INSN (insn))
+-- 
+2.49.0
+
