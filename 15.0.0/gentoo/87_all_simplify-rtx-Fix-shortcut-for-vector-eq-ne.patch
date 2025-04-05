@@ -1,0 +1,131 @@
+https://inbox.sourceware.org/gcc-patches/mpt7c443wm7.fsf@arm.com/
+
+From 5cc0c07a938202390b612f4e47934c09a17cad9a Mon Sep 17 00:00:00 2001
+Message-ID: <5cc0c07a938202390b612f4e47934c09a17cad9a.1743817315.git.sam@gentoo.org>
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Tue, 1 Apr 2025 13:16:32 +0100
+Subject: [PATCH] simplify-rtx: Fix shortcut for vector eq/ne
+
+This patch forestalls a regression in gcc.dg/rtl/x86_64/vector_eq.c
+with the patch for PR116398.  The test wants:
+
+      (cinsn 3 (set (reg:V4SI <0>) (const_vector:V4SI [(const_int 0) (const_int 0) (const_int 0) (const_int 0)])))
+      (cinsn 5 (set (reg:V4SI <2>)
+		    (eq:V4SI (reg:V4SI <0>) (reg:V4SI <1>))))
+
+to be folded to a vector of -1s.  One unusual thing about the fold
+is that the <1> in the second insn is uninitialised; it looks like
+it should be replaced by <0>, or that there should be an insn 4 that
+copies <0> to <1>.
+
+As it stands, the test relies on init-regs to insert a zero
+initialisation of <1>.  This happens after all the cse/pre/fwprop
+stuff, with only dce passes between init-regs and combine.
+Combine therefore sees:
+
+(insn 3 2 8 2 (set (reg:V4SI 98)
+        (const_vector:V4SI [
+                (const_int 0 [0]) repeated x4
+            ])) 2403 {movv4si_internal}
+     (nil))
+(insn 8 3 9 2 (clobber (reg:V4SI 99)) -1
+     (nil))
+(insn 9 8 5 2 (set (reg:V4SI 99)
+        (const_vector:V4SI [
+                (const_int 0 [0]) repeated x4
+            ])) -1
+     (nil))
+(insn 5 9 7 2 (set (reg:V4SI 100)
+        (eq:V4SI (reg:V4SI 98)
+            (reg:V4SI 99))) 7874 {*sse2_eqv4si3}
+     (expr_list:REG_DEAD (reg:V4SI 99)
+        (expr_list:REG_DEAD (reg:V4SI 98)
+            (expr_list:REG_EQUAL (eq:V4SI (const_vector:V4SI [
+                            (const_int 0 [0]) repeated x4
+                        ])
+                    (reg:V4SI 99))
+                (nil)))))
+
+It looks like the test should then pass through a 3, 9 -> 5 combination,
+so that we get an (eq ...) between two zeros and fold it to a vector
+of -1s.  But although the combination is attempted, the fold doesn't
+happen.  Instead, combine is left to match the unsimplified (eq ...)
+between two zeros, which rightly fails.  The test only passes because
+late_combine2 happens to try simplifying an (eq ...) between reg X and
+reg X, which does fold to a vector of -1s.
+
+The different handling of registers and constants is due to this
+code in simplify_const_relational_operation:
+
+  if (INTEGRAL_MODE_P (mode) && trueop1 != const0_rtx
+      && (code == EQ || code == NE)
+      && ! ((REG_P (op0) || CONST_INT_P (trueop0))
+	    && (REG_P (op1) || CONST_INT_P (trueop1)))
+      && (tem = simplify_binary_operation (MINUS, mode, op0, op1)) != 0
+      /* We cannot do this if tem is a nonzero address.  */
+      && ! nonzero_address_p (tem))
+    return simplify_const_relational_operation (signed_condition (code),
+						mode, tem, const0_rtx);
+
+INTEGRAL_MODE_P matches vector integer modes, but everything else
+about the condition is written for scalar integers only.  Thus if
+trueop0 and trueop1 are equal vector constants, we'll bypass all
+the exclusions and try simplifying a subtraction.  This will succeed,
+giving a vector of zeros.  The recursive call will then try to simplify
+a comparison between the vector of zeros and const0_rtx, which isn't
+well-formed.  Luckily or unluckily, the ill-formedness doesn't trigger
+an ICE, but it does prevent any simplification from happening.
+
+The least-effort fix would be to replace INTEGRAL_MODE_P with
+SCALAR_INT_MODE_P.  But the fold does make conceptual sense for
+vectors too, so it seemed better to keep the INTEGRAL_MODE_P and
+generalise the rest of the condition to match.
+
+Tested on aarch64-linux-gnu & x86_64-linux-gnu.  OK to install?
+
+I'm hoping to post the actual patch for PR116398 later today.
+
+Richard
+
+gcc/
+	* simplify-rtx.cc (simplify_const_relational_operation): Generalize
+	the constant checks in the fold-via-minus path to match the
+	INTEGRAL_MODE_P condition.
+---
+ gcc/simplify-rtx.cc | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/simplify-rtx.cc b/gcc/simplify-rtx.cc
+index fe007bc7d96a..6f969effdf99 100644
+--- a/gcc/simplify-rtx.cc
++++ b/gcc/simplify-rtx.cc
+@@ -6657,15 +6657,20 @@ simplify_const_relational_operation (enum rtx_code code,
+      we do not know the signedness of the operation on either the left or
+      the right hand side of the comparison.  */
+ 
+-  if (INTEGRAL_MODE_P (mode) && trueop1 != const0_rtx
++  if (INTEGRAL_MODE_P (mode)
++      && trueop1 != CONST0_RTX (mode)
+       && (code == EQ || code == NE)
+-      && ! ((REG_P (op0) || CONST_INT_P (trueop0))
+-	    && (REG_P (op1) || CONST_INT_P (trueop1)))
++      && ! ((REG_P (op0)
++	     || CONST_SCALAR_INT_P (trueop0)
++	     || CONST_VECTOR_P (trueop0))
++	    && (REG_P (op1)
++		|| CONST_SCALAR_INT_P (trueop1)
++		|| CONST_VECTOR_P (trueop1)))
+       && (tem = simplify_binary_operation (MINUS, mode, op0, op1)) != 0
+       /* We cannot do this if tem is a nonzero address.  */
+       && ! nonzero_address_p (tem))
+     return simplify_const_relational_operation (signed_condition (code),
+-						mode, tem, const0_rtx);
++						mode, tem, CONST0_RTX (mode));
+ 
+   if (! HONOR_NANS (mode) && code == ORDERED)
+     return const_true_rtx;
+
+base-commit: 2f62e66e1444d858e937faa7147f6cd06296b33b
+-- 
+2.49.0
+

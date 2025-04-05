@@ -4,6 +4,7 @@
 	+ 84_all_combine-Avoid-split_i2i3-search-if-i2-is-unchanged-P.patch
 	+ 85_all_combine-Optimise-distribute_links-search-PR116398.patch
 	+ 86_all_combine-Limit-insn-searchs-for-2-2-combinations-PR11.patch
+	+ 87_all_simplify-rtx-Fix-shortcut-for-vector-eq-ne.patch
 
 51	2 April 2025
 
