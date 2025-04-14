@@ -1,0 +1,93 @@
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119614#c28
+--- a/gcc/symtab-clones.h	2025-04-14 22:51:13.172434417 +0200
++++ b/gcc/symtab-clones.h	2025-04-14 22:55:11.461235984 +0200
+@@ -29,7 +29,7 @@ struct GTY(()) clone_info
+   clone_info ()
+     : tree_map (NULL),
+       param_adjustments (NULL),
+-    m_return_vr (nullptr)
++      m_return_vr (nullptr)
+   {
+   }
+   /* Constants discovered by IPA-CP, i.e. which parameter should be replaced
+--- a/gcc/ipa-prop.cc	2025-04-14 22:51:13.172434417 +0200
++++ b/gcc/ipa-prop.cc	2025-04-14 22:54:56.094442247 +0200
+@@ -2324,17 +2324,19 @@ ipa_get_value_range (const vrange &tmp)
+ }
+ 
+ /* Read an IPA-VR from IB and DATA_IN.  If it does not contain useful info,
+-   return nullptr. If it is already in the hash of IPA-VRs, return the already
++   return nullptr.  If it is already in the hash of IPA-VRs, return the already
+    present value, otherwise add it to the hash and return this new value.  */
+ 
+-ipa_vr *streamer_read_and_hash (lto_input_block *ib, data_in *data_in)
++ipa_vr *
++streamer_read_and_hash (lto_input_block *ib, data_in *data_in)
+ {
+   ipa_vr ivr;
+   ivr.streamer_read (ib, data_in);
+   if (ivr.known_p ())
+     {
+       if (!ipa_vr_hash_table)
+-	ipa_vr_hash_table = hash_table<ipa_vr_ggc_hash_traits>::create_ggc (37);
++	ipa_vr_hash_table
++	  = hash_table<ipa_vr_ggc_hash_traits>::create_ggc (37);
+ 
+       value_range tmp;
+       ivr.get_vrange (tmp);
+@@ -6266,7 +6268,7 @@ bool
+ ipa_return_value_range (value_range &range, tree decl)
+ {
+   cgraph_node *n = cgraph_node::get (decl);
+-  if (!n || (!ipa_return_value_sum))
++  if (!n)
+     return false;
+   enum availability avail;
+   n = n->ultimate_alias_target (&avail);
+@@ -6277,8 +6279,7 @@ ipa_return_value_range (value_range &ran
+ 
+   if (ipa_return_value_sum)
+     {
+-      ipa_return_value_summary *v = ipa_return_value_sum->get (n);
+-      if (v)
++      if (ipa_return_value_summary *v = ipa_return_value_sum->get (n))
+ 	{
+ 	  v->vr->get_vrange (range);
+ 	  return true;
+--- a/gcc/testsuite/g++.dg/lto/pr119614_0.C	2025-04-14 22:52:58.938014778 +0200
++++ b/gcc/testsuite/g++.dg/lto/pr119614_0.C	2025-04-14 22:52:58.938014778 +0200
+@@ -0,0 +1,34 @@
++// PR tree-optimization/119614
++// { dg-lto-do link }
++// { dg-lto-options { { -O2 -fPIC -flto -flto-partition=max } } }
++// { dg-require-effective-target shared }
++// { dg-require-effective-target fpic }
++// { dg-require-effective-target musttail }
++// { dg-extra-ld-options "-shared" }
++
++struct S {} b;
++char *foo ();
++int e, g;
++void bar ();
++void corge (S);
++
++[[gnu::noinline]] static char *
++baz ()
++{
++  bar ();
++  return 0;
++}
++
++const char *
++qux ()
++{
++  if (e)
++    {
++      S a = b;
++      corge (a);
++      if (g)
++        return 0;
++      [[gnu::musttail]] return baz ();
++    }
++  return foo ();
++}
