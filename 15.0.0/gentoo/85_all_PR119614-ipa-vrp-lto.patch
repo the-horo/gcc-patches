@@ -1,0 +1,257 @@
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119614#c27
+diff --git a/gcc/ipa-cp.cc b/gcc/ipa-cp.cc
+index 26b1496f29b..9b47c6c364d 100644
+--- a/gcc/ipa-cp.cc
++++ b/gcc/ipa-cp.cc
+@@ -6334,6 +6334,13 @@ ipcp_store_vr_results (void)
+ 
+       if (info->ipcp_orig_node)
+ 	info = ipa_node_params_sum->get (info->ipcp_orig_node);
++
++      if (do_vr && info->m_return_vr)
++	{
++	  clone_info *clone_info = clone_info::get_create (node);
++	  clone_info->m_return_vr = info->m_return_vr;
++	}
++
+       if (info->lattices.is_empty ())
+ 	/* Newly expanded artificial thunks do not have lattices.  */
+ 	continue;
+diff --git a/gcc/ipa-prop.cc b/gcc/ipa-prop.cc
+index 49d68ab044b..d44c360b292 100644
+--- a/gcc/ipa-prop.cc
++++ b/gcc/ipa-prop.cc
+@@ -2323,6 +2323,26 @@ ipa_get_value_range (const vrange &tmp)
+   return vr;
+ }
+ 
++/* Read an IPA-VR from IB and DATA_IN.  If it does not contain useful info,
++   return nullptr. If it is already in the hash of IPA-VRs, return the already
++   present value, otherwise add it to the hash and return this new value.  */
++
++ipa_vr *streamer_read_and_hash (lto_input_block *ib, data_in *data_in)
++{
++  ipa_vr ivr;
++  ivr.streamer_read (ib, data_in);
++  if (ivr.known_p ())
++    {
++      if (!ipa_vr_hash_table)
++	ipa_vr_hash_table = hash_table<ipa_vr_ggc_hash_traits>::create_ggc (37);
++
++      value_range tmp;
++      ivr.get_vrange (tmp);
++      return ipa_get_value_range (tmp);
++    }
++  return nullptr;
++}
++
+ /* Assign to JF a pointer to a range just like TMP but either fetch a
+    copy from ipa_vr_hash_table or allocate a new on in GC memory.  */
+ 
+@@ -3312,6 +3332,14 @@ ipa_analyze_node (struct cgraph_node *node)
+   analysis_dom_walker (&fbi).walk (ENTRY_BLOCK_PTR_FOR_FN (cfun));
+   disable_ranger (cfun);
+ 
++  ipa_return_value_summary *rvs;
++
++  if (ipa_return_value_sum
++      && (rvs = ipa_return_value_sum->get (node)))
++    /* The VRs in the summary already live in the cache, no need to go through
++       ipa_get_value_range.  */
++    info->m_return_vr = rvs->vr;
++
+   ipa_release_body_info (&fbi);
+   free_dominance_info (CDI_DOMINATORS);
+   pop_cfun ();
+@@ -4793,6 +4821,8 @@ ipa_node_params_t::duplicate(cgraph_node *, cgraph_node *,
+   new_info->known_csts = old_info->known_csts.copy ();
+   new_info->known_contexts = old_info->known_contexts.copy ();
+ 
++  new_info->m_return_vr = old_info->m_return_vr;
++
+   new_info->analysis_done = old_info->analysis_done;
+   new_info->node_enqueued = old_info->node_enqueued;
+   new_info->versionable = old_info->versionable;
+@@ -5272,6 +5302,15 @@ ipa_write_node_info (struct output_block *ob, struct cgraph_node *node)
+   streamer_write_uhwi (ob, ipa_get_param_count (info));
+   for (j = 0; j < ipa_get_param_count (info); j++)
+     streamer_write_uhwi (ob, ipa_get_param_move_cost (info, j));
++  if (info->m_return_vr)
++    info->m_return_vr->streamer_write (ob);
++  else
++    {
++      bp = bitpack_create (ob->main_stream);
++      bp_pack_value (&bp, false, 1);
++      streamer_write_bitpack (&bp);
++    }
++
+   bp = bitpack_create (ob->main_stream);
+   gcc_assert (info->analysis_done
+ 	      || ipa_get_param_count (info) == 0);
+@@ -5407,6 +5446,15 @@ ipa_read_node_info (class lto_input_block *ib, struct cgraph_node *node,
+     for (k = 0; k < param_count; k++)
+       streamer_read_uhwi (ib);
+ 
++  ipa_vr rvr;
++  rvr.streamer_read (ib, data_in);
++  if (prevails && rvr.known_p ())
++    {
++      value_range tmp;
++      rvr.get_vrange (tmp);
++      info->m_return_vr = ipa_get_value_range (tmp);
++    }
++
+   bp = streamer_read_bitpack (ib);
+   for (k = 0; k < param_count; k++)
+     {
+@@ -6218,7 +6266,7 @@ bool
+ ipa_return_value_range (value_range &range, tree decl)
+ {
+   cgraph_node *n = cgraph_node::get (decl);
+-  if (!n || !ipa_return_value_sum)
++  if (!n || (!ipa_return_value_sum))
+     return false;
+   enum availability avail;
+   n = n->ultimate_alias_target (&avail);
+@@ -6226,11 +6274,25 @@ ipa_return_value_range (value_range &range, tree decl)
+     return false;
+   if (n->decl != decl && !useless_type_conversion_p (TREE_TYPE (decl), TREE_TYPE (n->decl)))
+     return false;
+-  ipa_return_value_summary *v = ipa_return_value_sum->get (n);
+-  if (!v)
+-    return false;
+-  v->vr->get_vrange (range);
+-  return true;
++
++  if (ipa_return_value_sum)
++    {
++      ipa_return_value_summary *v = ipa_return_value_sum->get (n);
++      if (v)
++	{
++	  v->vr->get_vrange (range);
++	  return true;
++	}
++    }
++
++  clone_info *info = clone_info::get (n);
++  if (info && info->m_return_vr)
++    {
++      gcc_assert (info->m_return_vr->known_p ());
++      info->m_return_vr->get_vrange (range);
++      return true;
++    }
++  return false;
+ }
+ 
+ /* Reset all state within ipa-prop.cc so that we can rerun the compiler
+diff --git a/gcc/ipa-prop.h b/gcc/ipa-prop.h
+index 3bd442fff39..8dc8e2f2ab5 100644
+--- a/gcc/ipa-prop.h
++++ b/gcc/ipa-prop.h
+@@ -653,6 +653,9 @@ public:
+   /* If this node is an ipa-cp clone, these are the known polymorphic contexts
+      that describe what it has been specialized for.  */
+   vec<ipa_polymorphic_call_context> GTY((skip)) known_contexts;
++  /* If non-NULL, the known value range of the return value of this
++     function.  */
++  class ipa_vr *m_return_vr;
+   /* Whether the param uses analysis and jump function computation has already
+      been performed.  */
+   unsigned analysis_done : 1;
+@@ -679,10 +682,10 @@ public:
+ inline
+ ipa_node_params::ipa_node_params ()
+ : descriptors (NULL), lattices (vNULL), ipcp_orig_node (NULL),
+-  known_csts (vNULL), known_contexts (vNULL), analysis_done (0),
+-  node_enqueued (0), do_clone_for_all_contexts (0), is_all_contexts_clone (0),
+-  node_dead (0), node_within_scc (0), node_is_self_scc (0),
+-  node_calling_single_call (0), versionable (0)
++  known_csts (vNULL), known_contexts (vNULL), m_return_vr (nullptr),
++  analysis_done (0), node_enqueued (0), do_clone_for_all_contexts (0),
++  is_all_contexts_clone (0), node_dead (0), node_within_scc (0),
++  node_is_self_scc (0), node_calling_single_call (0), versionable (0)
+ {
+ }
+ 
+@@ -1275,6 +1278,7 @@ bool unadjusted_ptr_and_unit_offset (tree op, tree *ret,
+ 				     poly_int64 *offset_ret);
+ void ipa_get_range_from_ip_invariant (vrange &r, tree val, cgraph_node *node);
+ void ipa_prop_cc_finalize (void);
++ipa_vr *streamer_read_and_hash (lto_input_block *ib, data_in *data_in);
+ 
+ /* From tree-sra.cc:  */
+ tree build_ref_for_offset (location_t, tree, poly_int64, bool, tree,
+diff --git a/gcc/lto-cgraph.cc b/gcc/lto-cgraph.cc
+index ac835a435ec..877a9a496cc 100644
+--- a/gcc/lto-cgraph.cc
++++ b/gcc/lto-cgraph.cc
+@@ -44,6 +44,11 @@ along with GCC; see the file COPYING3.  If not see
+ #include "symbol-summary.h"
+ #include "symtab-thunks.h"
+ #include "symtab-clones.h"
++#include "sreal.h"
++#include "value-range.h"
++#include "value-range-storage.h"
++#include "ipa-cp.h"
++#include "ipa-prop.h"
+ 
+ /* True when asm nodes has been output.  */
+ bool asm_nodes_output = false;
+@@ -2065,6 +2070,15 @@ output_node_opt_summary (struct output_block *ob,
+ 	stream_write_tree (ob, map->new_tree, true);
+       }
+ 
++  if (info && info->m_return_vr)
++    info->m_return_vr->streamer_write (ob);
++  else
++    {
++      bp = bitpack_create (ob->main_stream);
++      bp_pack_value (&bp, false, 1);
++      streamer_write_bitpack (&bp);
++    }
++
+   if (lto_symtab_encoder_in_partition_p (encoder, node))
+     {
+       for (e = node->callees; e; e = e->next_callee)
+@@ -2181,6 +2195,9 @@ input_node_opt_summary (struct cgraph_node *node,
+       map->parm_num = streamer_read_uhwi (ib_main);
+       map->new_tree = stream_read_tree (ib_main, data_in);
+     }
++
++  info->m_return_vr = streamer_read_and_hash (ib_main, data_in);
++
+   for (e = node->callees; e; e = e->next_callee)
+     input_edge_opt_summary (e, ib_main);
+   for (e = node->indirect_calls; e; e = e->next_callee)
+diff --git a/gcc/symtab-clones.h b/gcc/symtab-clones.h
+index 362bcb63dd1..eb5167d7506 100644
+--- a/gcc/symtab-clones.h
++++ b/gcc/symtab-clones.h
+@@ -21,12 +21,15 @@ along with GCC; see the file COPYING3.  If not see
+ #ifndef GCC_SYMTAB_CLONES_H
+ #define GCC_SYMTAB_CLONES_H
+ 
++class ipa_vr;
++
+ struct GTY(()) clone_info
+ {
+   /* Constructor.  */
+   clone_info ()
+     : tree_map (NULL),
+-      param_adjustments (NULL)
++      param_adjustments (NULL),
++    m_return_vr (nullptr)
+   {
+   }
+   /* Constants discovered by IPA-CP, i.e. which parameter should be replaced
+@@ -35,6 +38,10 @@ struct GTY(()) clone_info
+   /* Parameter modification that IPA-SRA decided to perform.  */
+   ipa_param_adjustments *param_adjustments;
+ 
++  /* If non-NULL, the known value range of the return value of this
++     function.  */
++  ipa_vr *m_return_vr;
++
+   /* Return clone_info, if available.  */
+   static clone_info *get (cgraph_node *node);
+ 
