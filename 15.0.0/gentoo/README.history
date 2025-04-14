@@ -3,6 +3,8 @@
 	- 82_all_PR119318-ipa-cp.patch
 	- 84_all_PR116975.patch
 	+ 84_all_PR116975-GDCFLAGS.patch
+	+ 85_all_PR119614-ipa-vrp-lto.patch
+	+ 86_all_PR119614-ipa-vrp-lto-inc.patch
 
 54	13 April 2025
 
