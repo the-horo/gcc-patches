@@ -1,26 +1,24 @@
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119614#c37
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119614#c46
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119614#c47
 
 	PR tree-optimization/119614
 
 gcc/ChangeLog:
 
-	* ipa-prop.cc (ipa_write_return_summaries): New function.
-	(ipa_record_return_value_range_1): Break out from ...
-	(ipa_record_return_value_range): ... here.
-	(ipa_read_return_summaries): New function.
-	(ipa_prop_read_section): Read return summaries.
-	(read_ipcp_transformation_info): Read return summaries.
-	(ipcp_write_transformation_summaries): write return summaries
+	* ipa-prop.cc (ipa_write_return_summaries):
+	(ipa_record_return_value_range_1):
+	(ipa_read_return_summaries):
+	(ipa_prop_read_section):
+	(read_ipcp_transformation_info):
+	(ipcp_write_transformation_summaries):
+	(read_replacements_section):
+	(ipa_record_return_value_range):
 
 gcc/testsuite/ChangeLog:
 
 	* g++.dg/lto/pr119614_0.C: New test.
 
-
-
 diff --git a/gcc/ipa-prop.cc b/gcc/ipa-prop.cc
-index 49d68ab044b..f959458ca1e 100644
+index 49d68ab044b..7b50c4fc31f 100644
 --- a/gcc/ipa-prop.cc
 +++ b/gcc/ipa-prop.cc
 @@ -5439,6 +5439,49 @@ ipa_read_node_info (class lto_input_block *ib, struct cgraph_node *node,
@@ -73,7 +71,7 @@ index 49d68ab044b..f959458ca1e 100644
  /* Write jump functions for nodes in SET.  */
  
  void
-@@ -5475,11 +5518,56 @@ ipa_prop_write_jump_functions (void)
+@@ -5475,11 +5518,54 @@ ipa_prop_write_jump_functions (void)
  	  && ipa_node_params_sum->get (node) != NULL)
          ipa_write_node_info (ob, node);
      }
@@ -112,7 +110,6 @@ index 49d68ab044b..f959458ca1e 100644
 +			   class data_in *data_in)
 +{
 +  unsigned int f_count = streamer_read_uhwi (ib);
-+  //fprintf (stderr, "reading %i:\n", f_count);
 +  for (unsigned int i = 0; i < f_count; i++)
 +    {
 +      unsigned int index = streamer_read_uhwi (ib);
@@ -121,7 +118,6 @@ index 49d68ab044b..f959458ca1e 100644
 +								index));
 +      ipa_vr rvr;
 +      rvr.streamer_read (ib, data_in);
-+      //rvr.dump (stderr);
 +      value_range tmp;
 +      rvr.get_vrange (tmp);
 +      ipa_record_return_value_range_1 (node, tmp);
@@ -131,7 +127,7 @@ index 49d68ab044b..f959458ca1e 100644
  /* Read section in file FILE_DATA of length LEN with data DATA.  */
  
  static void
-@@ -5516,6 +5604,7 @@ ipa_prop_read_section (struct lto_file_decl_data *file_data, const char *data,
+@@ -5516,6 +5602,7 @@ ipa_prop_read_section (struct lto_file_decl_data *file_data, const char *data,
        gcc_assert (node->definition);
        ipa_read_node_info (&ib_main, node, data_in);
      }
@@ -139,7 +135,7 @@ index 49d68ab044b..f959458ca1e 100644
    lto_free_section_data (file_data, LTO_section_jump_functions, NULL, data,
  			 len);
    lto_data_in_delete (data_in);
-@@ -5635,6 +5724,7 @@ read_ipcp_transformation_info (lto_input_block *ib, cgraph_node *node,
+@@ -5635,6 +5722,7 @@ read_ipcp_transformation_info (lto_input_block *ib, cgraph_node *node,
      }
  }
  
@@ -147,7 +143,7 @@ index 49d68ab044b..f959458ca1e 100644
  /* Write all aggregate replacement for nodes in set.  */
  
  void
-@@ -5673,7 +5763,7 @@ ipcp_write_transformation_summaries (void)
+@@ -5673,7 +5761,7 @@ ipcp_write_transformation_summaries (void)
  	  && lto_symtab_encoder_encode_body_p (encoder, cnode))
  	write_ipcp_transformation_info (ob, cnode, ts);
      }
@@ -156,7 +152,7 @@ index 49d68ab044b..f959458ca1e 100644
    produce_asm (ob);
    destroy_output_block (ob);
  }
-@@ -5714,6 +5804,7 @@ read_replacements_section (struct lto_file_decl_data *file_data,
+@@ -5714,6 +5802,7 @@ read_replacements_section (struct lto_file_decl_data *file_data,
  								index));
        read_ipcp_transformation_info (&ib_main, node, data_in);
      }
@@ -164,7 +160,7 @@ index 49d68ab044b..f959458ca1e 100644
    lto_free_section_data (file_data, LTO_section_jump_functions, NULL, data,
  			 len);
    lto_data_in_delete (data_in);
-@@ -6194,22 +6285,7 @@ ipcp_transform_function (struct cgraph_node *node)
+@@ -6194,22 +6283,7 @@ ipcp_transform_function (struct cgraph_node *node)
  void
  ipa_record_return_value_range (value_range val)
  {
