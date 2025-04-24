@@ -54,24 +54,6 @@ index 542d100c2b73..cc8247037569 100755
  
  # Enable __cxa_atexit for C++.
  # Check whether --enable-__cxa_atexit was given.
-@@ -19896,7 +19891,7 @@ else
-   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
-   lt_status=$lt_dlunknown
-   cat > conftest.$ac_ext <<_LT_EOF
--#line 19899 "configure"
-+#line 19894 "configure"
- #include "confdefs.h"
- 
- #if HAVE_DLFCN_H
-@@ -20002,7 +19997,7 @@ else
-   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
-   lt_status=$lt_dlunknown
-   cat > conftest.$ac_ext <<_LT_EOF
--#line 20005 "configure"
-+#line 20000 "configure"
- #include "confdefs.h"
- 
- #if HAVE_DLFCN_H
 diff --git a/gcc/configure.ac b/gcc/configure.ac
 index 31aa8566a3e7..d02ffc22a3a3 100644
 --- a/gcc/configure.ac
