@@ -1,0 +1,35 @@
+From e11fc43562a4aaa15b757d5728dd5a514e128bee Mon Sep 17 00:00:00 2001
+Message-ID: <e11fc43562a4aaa15b757d5728dd5a514e128bee.1746450157.git.sam@gentoo.org>
+In-Reply-To: <4c57a4d3c280b249649495e032682f5eea41752b.1746450157.git.sam@gentoo.org>
+References: <4c57a4d3c280b249649495e032682f5eea41752b.1746450157.git.sam@gentoo.org>
+From: Sam James <sam@gentoo.org>
+Date: Mon, 5 May 2025 14:02:09 +0100
+Subject: [PATCH 2/4] Revert "gimple: Don't warn about using different algs for
+ big switch lowering [PR117091]"
+
+This reverts commit c14560907a9586ad405f26ab937881eb08f39497.
+---
+ gcc/tree-switch-conversion.cc | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/gcc/tree-switch-conversion.cc b/gcc/tree-switch-conversion.cc
+index dea217a01efb..4f0be8c43f07 100644
+--- a/gcc/tree-switch-conversion.cc
++++ b/gcc/tree-switch-conversion.cc
+@@ -2257,6 +2257,13 @@ switch_decision_tree::analyze_switch_statement ()
+ 
+   reset_out_edges_aux (m_switch);
+ 
++  if (l > (unsigned) param_switch_lower_slow_alg_max_cases)
++    warning_at (gimple_location (m_switch), OPT_Wdisabled_optimization,
++	       "Using faster switch lowering algorithms. "
++	       "Number of switch cases (%d) exceeds "
++	       "%<--param=switch-lower-slow-alg-max-cases=%d%> limit.",
++	       l, param_switch_lower_slow_alg_max_cases);
++
+   /* Find bit-test clusters.  */
+   vec<cluster *> output = bit_test_cluster::find_bit_tests (clusters, max_c);
+ 
+-- 
+2.49.0
+
