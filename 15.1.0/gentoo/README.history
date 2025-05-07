@@ -27,3 +27,4 @@
 	+ 35_all_checking-gc-use-heuristics.patch
 	+ 76_all_PR117854-config-nvptx-fix-bashisms-with-gen-copyright.sh-use.patch
 	+ 84_all_PR116975-GDCFLAGS.patch
+	+ 85_all_PR119356-riscv-libsanitizer.patch
