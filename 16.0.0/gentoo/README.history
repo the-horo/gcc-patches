@@ -1,6 +1,9 @@
 2	????
 
-	+ 85_all_gimple-Don-t-assert-that-switch-has-nondefault-cases.patch
+	- 85_all_PR120080_Revert-gimple-Switch-bit-test-lowering-testcases-for.patch
+	- 86_all_PR120080_Revert-gimple-Don-t-warn-about-using-different-algs-.patch
+	- 87_all_PR120080-Revert-gimple-Make-bit-test-switch-lowering-more-pow.patch
+	- 88_all_PR120080-Revert-gimple-Merge-slow-and-fast-bit-test-switch-lo.patch
 
 1	5 May 2025
 
