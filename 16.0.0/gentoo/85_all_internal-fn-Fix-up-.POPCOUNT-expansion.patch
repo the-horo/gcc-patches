@@ -1,0 +1,61 @@
+https://inbox.sourceware.org/gcc-patches/aEikagD%2FQXo+jH5H@tucnak/
+
+From a345b00cf30f9a10dfdb6be93287b4885fea68fd Mon Sep 17 00:00:00 2001
+Message-ID: <a345b00cf30f9a10dfdb6be93287b4885fea68fd.1749611907.git.sam@gentoo.org>
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 10 Jun 2025 23:32:26 +0200
+Subject: [PATCH] internal-fn: Fix up .POPCOUNT expansion
+
+Hi!
+
+Apparently my ranger during expansion patch broke bootstrap on
+aarch64-linux, while building libsupc++, there is endless recursion
+on __builtin_popcountl (x) == 1 expansion.
+The hack to temporarily replace SSA_NAME_VAR of the lhs which replaced
+the earlier hack to temporarily change the gimple_call_lhs relies on
+the lhs being expanded with EXPAND_WRITE when expanding that ifn call.
+Unfortunately, in two spots I was using expand_normal (lhs) instead
+of expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE) which was used
+everywhere else in internal-fn.cc.  This happened to work fine in the
+past, but doesn't anymore.  git blame shows it was my patch using
+these incorrect calls.
+
+Fixed thusly, bootstrap/regtests on x86_64-linux, i686-linux and
+aarch64-linux are running, ok for trunk if it passes?
+
+2025-06-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* internal-fn.cc (expand_POPCOUNT): Use
+	expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE) instead of
+	expand_normal (lhs).
+---
+ gcc/internal-fn.cc | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/internal-fn.cc b/gcc/internal-fn.cc
+index a0a73fefb906..3f4ac937367d 100644
+--- a/gcc/internal-fn.cc
++++ b/gcc/internal-fn.cc
+@@ -5561,7 +5561,7 @@ expand_POPCOUNT (internal_fn fn, gcall *stmt)
+   expand_unary_optab_fn (fn, stmt, popcount_optab);
+   rtx_insn *popcount_insns = end_sequence ();
+   start_sequence ();
+-  rtx plhs = expand_normal (lhs);
++  rtx plhs = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
+   rtx pcmp = emit_store_flag (NULL_RTX, EQ, plhs, const1_rtx, lhsmode, 0, 0);
+   if (pcmp == NULL_RTX)
+     {
+@@ -5603,7 +5603,7 @@ expand_POPCOUNT (internal_fn fn, gcall *stmt)
+     {
+       start_sequence ();
+       emit_insn (cmp_insns);
+-      plhs = expand_normal (lhs);
++      plhs = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
+       if (GET_MODE (cmp) != GET_MODE (plhs))
+ 	cmp = convert_to_mode (GET_MODE (plhs), cmp, 1);
+       /* For `<= 1`, we need to produce `2 - cmp` or `cmp ? 1 : 2` as that
+
+base-commit: 2c3ce07c568037a085bfcc438e2e823060980225
+-- 
+2.49.0
+
