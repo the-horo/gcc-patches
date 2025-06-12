@@ -1,0 +1,101 @@
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120629#c22
+
+2025-06-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/120629
+	* cfgexpand.cc (expand_gimple_cond): If dest bb isn't BB_RTL,
+	has any PHI nodes and false_edge->dest_idx before redirection is
+	different from make_single_succ_edge result's dest_idx, swap the
+	latter with the former last pred edge and their dest_idx members.
+
+	* g++.dg/opt/pr120629.C: New test.
+
+--- a/gcc/cfgexpand.cc	2025-06-11 19:28:52.462056696 +0200
++++ g/gcc/cfgexpand.cc	2025-06-12 00:05:27.524152553 +0200
+@@ -3013,6 +3013,9 @@ expand_gimple_cond (basic_block bb, gcon
+ 
+   new_bb = create_basic_block (NEXT_INSN (last), get_last_insn (), bb);
+   dest = false_edge->dest;
++  unsigned int dest_idx = 0;
++  if ((dest->flags & BB_RTL) == 0 && phi_nodes (dest))
++    dest_idx = false_edge->dest_idx;
+   redirect_edge_succ (false_edge, new_bb);
+   false_edge->flags |= EDGE_FALLTHRU;
+   new_bb->count = false_edge->count ();
+@@ -3021,7 +3024,19 @@ expand_gimple_cond (basic_block bb, gcon
+   if (loop->latch == bb
+       && loop->header == dest)
+     loop->latch = new_bb;
+-  make_single_succ_edge (new_bb, dest, 0);
++  edge e = make_single_succ_edge (new_bb, dest, 0);
++  if ((dest->flags & BB_RTL) == 0
++      && phi_nodes (dest)
++      && e->dest_idx != dest_idx)
++    {
++      /* If there are any PHI nodes on dest, swap the new succ edge
++	 with the one moved into false_edge's former position, so that
++	 PHI arguments don't need adjustment.  */
++      edge e2 = EDGE_PRED (dest, dest_idx);
++      std::swap (e->dest_idx, e2->dest_idx);
++      std::swap (EDGE_PRED (dest, e->dest_idx),
++		 EDGE_PRED (dest, e2->dest_idx));
++    }
+   if (BARRIER_P (BB_END (new_bb)))
+     BB_END (new_bb) = PREV_INSN (BB_END (new_bb));
+   update_bb_for_insn (new_bb);
+--- a/gcc/testsuite/g++.dg/opt/pr120629.C	2025-06-12 00:13:02.928211946 +0200
++++ g/gcc/testsuite/g++.dg/opt/pr120629.C	2025-06-12 00:14:26.008117524 +0200
+@@ -0,0 +1,53 @@
++// PR middle-end/120629
++// { dg-do run }
++// { dg-options "-O2 -fprofile-generate -fno-exceptions -fno-rtti" }
++// { dg-require-profiling "-fprofile-generate" }
++
++__attribute__((noipa, noreturn, cold)) void
++foo (const char *, int, const char *)
++{
++  __builtin_abort ();
++}
++
++struct S
++{
++  __attribute__((noipa)) void bar (void *);
++  static const int a = 8;
++  unsigned int b[a + 1];
++};
++
++__attribute__((noipa)) unsigned long
++baz (void *)
++{
++  static int x = 8;
++  return --x;
++}
++
++__attribute__((noipa)) void
++S::bar (void *x)
++{
++  unsigned int c;
++  int k = 0;
++
++  do
++    {
++      ((void) (!(k <= a) ? foo ("foo", 42, __FUNCTION__), 0 : 0));
++      c = b[k++] = baz (x);
++    }
++  while (c);
++  while (k <= a)
++    b[k++] = 0;
++}
++
++int
++main ()
++{
++  struct T { S a; unsigned int b; } s = {};
++  s.b = 0x1234;
++  s.a.bar (0);
++  for (int i = 0; i < 9; ++i)
++    if (s.a.b[i] != (i == 8 ? 0 : 7 - i))
++      __builtin_abort ();
++  if (s.b != 0x1234)
++    __builtin_abort ();
++}
