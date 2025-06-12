@@ -1,4 +1,50 @@
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120629#c22
+https://inbox.sourceware.org/gcc-patches/aEp6IPgAzLdU5pmi@tucnak/
+
+From 34ddeb4974ec668ee035735dcf57429c12b079b2 Mon Sep 17 00:00:00 2001
+Message-ID: <34ddeb4974ec668ee035735dcf57429c12b079b2.1749713239.git.sam@gentoo.org>
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 12 Jun 2025 08:56:32 +0200
+Subject: [PATCH] expand: Fix up edge splitting for GIMPLE_COND expansion if
+ there are any PHIs [PR120629]
+
+Hi!
+
+My r16-1398 PR120434 ranger during expansion change broke profiled lto
+bootstrap on x86_64-linux, the following testcase is reduced from that.
+
+The problem is during expand_gimple_cond, if we are unlucky that neither
+of edge_true and edge_false point to the next basic block, the code
+effectively attempts to split the false_edge and make the new bb BB_RTL
+with some extra instructions which just arranges to jump.
+It does it by creating a new bb, redirecting the false_edge and then
+creating a new edge from the new bb to the dest.
+Note, we don't have GIMPLE cfg hooks installed anymore and even if we
+would, the 3 calls aren't the same as one split_edge with transformation
+of the new bb into BB_RTL and adding it some BB_HEAD/BB_END.  If
+false_edge->dest is BB_RTL or doesn't have PHI nodes (which before my
+patch was always the case because), then this works fine, but with
+PHI nodes on false_edge->dest redirect_edge_succ will remove the false_edge
+from dest->preds (unordered remove which moves into its place the last edge
+in the vector) and the new make_edge will then add the new edge as last
+in the vector.  So, unless false_edge is the last edge in the dest->preds
+vector this effectively swaps the last edge in the vector with
+false_edge/its new replacement.
+gimple_split_edge solves this by temporarily clearing phi_nodes on dest
+(not needed when we don't have GIMPLE hooks), then making the new edge
+first and redirecting the old edge (plus restoring phi_nodes on dest).
+That way the redirection replaces the old edge with the new one and
+PHI arguments don't need adjustment.  At the cost of temporarily needing
+one more edge in the vector and so if unlucky reallocation.
+Doing it like that is one of the options (i.e. just move the
+make_single_succ_edge call).  This patch instead keeps doing what it did
+and just swaps two edges again if needed to restore the PHI behavior
+- remember edge_false->dest_idx first if there are PHI nodes in
+edge_false->dest and afterwards if new edge's dest_idx is different from
+the remembered one, swap the new edge with EDGE_PRED (dest, old_dest_idx).
+That way PHI arguments are maintained properly as well.  Without this
+we sometimes just swap PHI arguments.
+
+Bootstrapped/regtested on x86_64-linux and i686-linux, ok for trunk?
 
 2025-06-12  Jakub Jelinek  <jakub@redhat.com>
 
@@ -9,10 +55,17 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120629#c22
 	latter with the former last pred edge and their dest_idx members.
 
 	* g++.dg/opt/pr120629.C: New test.
+---
+ gcc/cfgexpand.cc                    | 17 ++++++++-
+ gcc/testsuite/g++.dg/opt/pr120629.C | 53 +++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/opt/pr120629.C
 
---- a/gcc/cfgexpand.cc	2025-06-11 19:28:52.462056696 +0200
-+++ g/gcc/cfgexpand.cc	2025-06-12 00:05:27.524152553 +0200
-@@ -3013,6 +3013,9 @@ expand_gimple_cond (basic_block bb, gcon
+diff --git a/gcc/cfgexpand.cc b/gcc/cfgexpand.cc
+index 49b0b1404200..ce694add0e38 100644
+--- a/gcc/cfgexpand.cc
++++ b/gcc/cfgexpand.cc
+@@ -3013,6 +3013,9 @@ expand_gimple_cond (basic_block bb, gcond *stmt)
  
    new_bb = create_basic_block (NEXT_INSN (last), get_last_insn (), bb);
    dest = false_edge->dest;
@@ -22,7 +75,7 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120629#c22
    redirect_edge_succ (false_edge, new_bb);
    false_edge->flags |= EDGE_FALLTHRU;
    new_bb->count = false_edge->count ();
-@@ -3021,7 +3024,19 @@ expand_gimple_cond (basic_block bb, gcon
+@@ -3021,7 +3024,19 @@ expand_gimple_cond (basic_block bb, gcond *stmt)
    if (loop->latch == bb
        && loop->header == dest)
      loop->latch = new_bb;
@@ -43,8 +96,11 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120629#c22
    if (BARRIER_P (BB_END (new_bb)))
      BB_END (new_bb) = PREV_INSN (BB_END (new_bb));
    update_bb_for_insn (new_bb);
---- a/gcc/testsuite/g++.dg/opt/pr120629.C	2025-06-12 00:13:02.928211946 +0200
-+++ g/gcc/testsuite/g++.dg/opt/pr120629.C	2025-06-12 00:14:26.008117524 +0200
+diff --git a/gcc/testsuite/g++.dg/opt/pr120629.C b/gcc/testsuite/g++.dg/opt/pr120629.C
+new file mode 100644
+index 000000000000..70a9cddcd3f2
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/pr120629.C
 @@ -0,0 +1,53 @@
 +// PR middle-end/120629
 +// { dg-do run }
@@ -99,3 +155,8 @@ https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120629#c22
 +  if (s.b != 0x1234)
 +    __builtin_abort ();
 +}
+
+base-commit: ccfd4163970b1aef12b40f49b826bb49f3fc6f2b
+-- 
+2.49.0
+
