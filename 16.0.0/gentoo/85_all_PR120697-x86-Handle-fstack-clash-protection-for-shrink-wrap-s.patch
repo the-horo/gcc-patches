@@ -1,23 +1,26 @@
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120697#c12
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120697#c14
 
-From 4f80288ecb15195c8baa3e0081354c4cab78db36 Mon Sep 17 00:00:00 2001
+From 73fe038b1974b8f2867a765e5cbf5846abae4a25 Mon Sep 17 00:00:00 2001
 From: Lili Cui <lili.cui@intel.com>
 Date: Tue, 17 Jun 2025 23:49:03 -0700
-Subject: [PATCH] x86: Handle -fstack-clash-protection for shrink wrap separate
+Subject: [PATCH 12/12] x86: Fix shrink wrap separate ICE under
+ -fstack-clash-protection [PR120697]
 
 gcc/ChangeLog:
 
-        * config/i386/i386.cc (ix86_expand_prologue):
+	PR target/120697
+	* config/i386/i386.cc (ix86_expand_prologue):
 	Delete 3 assertions and related code.
 
 gcc/testsuite/ChangeLog:
 
-        * g++.target/i386/shrink_wrap_separate.C:
-       	Add -fstack-clash-protection into build options.
+	PR target/120697
+	* gcc.target/i386/stack-clash-protection.c: New test.
 ---
- gcc/config/i386/i386.cc                            | 14 +-------------
- .../g++.target/i386/shrink_wrap_separate.C         |  2 +-
- 2 files changed, 2 insertions(+), 14 deletions(-)
+ gcc/config/i386/i386.cc                       | 14 +-------------
+ .../gcc.target/i386/stack-clash-protection.c  | 19 +++++++++++++++++++
+ 2 files changed, 20 insertions(+), 13 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/stack-clash-protection.c
 
 diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
 index 3824b533989..6dce7cdfdcb 100644
@@ -74,16 +77,30 @@ index 3824b533989..6dce7cdfdcb 100644
        pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
  			         GEN_INT (-allocate), -1,
  			         m->fs.cfa_reg == stack_pointer_rtx);
-diff --git a/gcc/testsuite/g++.target/i386/shrink_wrap_separate.C b/gcc/testsuite/g++.target/i386/shrink_wrap_separate.C
-index 294dccde5d3..a1772c3a396 100644
---- a/gcc/testsuite/g++.target/i386/shrink_wrap_separate.C
-+++ b/gcc/testsuite/g++.target/i386/shrink_wrap_separate.C
-@@ -1,5 +1,5 @@
- /* { dg-do compile } */
--/* { dg-options "-O2 -fdump-rtl-pro_and_epilogue" } */
-+/* { dg-options "-O2 -fstack-clash-protection -fdump-rtl-pro_and_epilogue" } */
- typedef struct a b;
- typedef double c;
- struct a {
+diff --git a/gcc/testsuite/gcc.target/i386/stack-clash-protection.c b/gcc/testsuite/gcc.target/i386/stack-clash-protection.c
+new file mode 100644
+index 00000000000..5be28cb3ac7
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/stack-clash-protection.c
+@@ -0,0 +1,19 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -fstack-clash-protection" } */
++
++int flag;
++void open();
++int getChar();
++typedef enum { QUOTE } CharType;
++typedef enum { UNQ } State;
++CharType getCharType();
++void expand() {
++  open();
++  if (flag)
++    return;
++  int ch = getChar();
++  State nextState = getCharType();
++  if (nextState)
++    while (ch)
++      ;
++}
 -- 
 2.34.1
