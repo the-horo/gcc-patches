@@ -1,0 +1,105 @@
+From a483146d61698559fbe3adad9a536b3eb509ecaa Mon Sep 17 00:00:00 2001
+Message-ID: <a483146d61698559fbe3adad9a536b3eb509ecaa.1750281360.git.sam@gentoo.org>
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 18 Jun 2025 21:47:22 +0200
+Subject: [PATCH] expand: Align PARM_DECLs again to at least BITS_PER_WORD if
+ possible [PR120689]
+
+Hi!
+
+The following testcase shows a regression caused by the r10-577 change
+made for cris.  Before that change, the MEM holding (in this case 3 byte)
+struct parameter was BITS_PER_WORD aligned, now it is just BITS_PER_UNIT
+aligned and that causes significantly worse generated code.
+So, the MAX (DECL_ALIGN (parm), BITS_PER_WORD) extra alignment clearly
+doesn't help just STRICT_ALIGNMENT targets, but other targets as well.
+Of course, it isn't worth doing stack realignment in the rare case of
+MAX_SUPPORTED_STACK_ALIGNMENT < BITS_PER_WORD targets like cris, so the
+patch only bumps the alignment if it won't go the
+> MAX_SUPPORTED_STACK_ALIGNMENT path because of that optimization.
+
+The change on the testcase is:
+bar:
+-	movl	%edi, %eax
+-	movzbl	%dil, %r8d
+-	movl	%esi, %ecx
+-	movzbl	%sil, %r10d
+-	movl	%edx, %r9d
+-	movzbl	%dl, %r11d
+-	shrl	$16, %edi
+-	andl	$65280, %ecx
+-	shrl	$16, %esi
+-	shrl	$16, %edx
+-	andl	$65280, %r9d
+-	orq	%r10, %rcx
+-	movzbl	%dl, %edx
+-	movzbl	%sil, %esi
+-	andl	$65280, %eax
+-	movzbl	%dil, %edi
+-	salq	$16, %rdx
+-	orq	%r11, %r9
+-	salq	$16, %rsi
+-	orq	%r8, %rax
+-	salq	$16, %rdi
+-	orq	%r9, %rdx
+-	orq	%rcx, %rsi
+-	orq	%rax, %rdi
+ 	jmp	foo
+
+Bootstrapped/regtested on x86_64-linux and i686-linux, ok for trunk?
+
+2025-06-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/120689
+	* function.cc (assign_parm_setup_block): Align parm to at least
+	word alignment even on !STRICT_ALIGNMENT targets, as long as
+	BITS_PER_WORD is not larger than MAX_SUPPORTED_STACK_ALIGNMENT.
+
+	* gcc.target/i386/pr120689.c: New test.
+---
+ gcc/function.cc                          |  2 +-
+ gcc/testsuite/gcc.target/i386/pr120689.c | 17 +++++++++++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr120689.c
+
+diff --git a/gcc/function.cc b/gcc/function.cc
+index a5b245a98e91..a3a74b44b916 100644
+--- a/gcc/function.cc
++++ b/gcc/function.cc
+@@ -2937,7 +2937,7 @@ assign_parm_setup_block (struct assign_parm_data_all *all,
+   if (stack_parm == 0)
+     {
+       HOST_WIDE_INT parm_align
+-	= (STRICT_ALIGNMENT
++	= ((STRICT_ALIGNMENT || BITS_PER_WORD <= MAX_SUPPORTED_STACK_ALIGNMENT)
+ 	   ? MAX (DECL_ALIGN (parm), BITS_PER_WORD) : DECL_ALIGN (parm));
+ 
+       SET_DECL_ALIGN (parm, parm_align);
+diff --git a/gcc/testsuite/gcc.target/i386/pr120689.c b/gcc/testsuite/gcc.target/i386/pr120689.c
+new file mode 100644
+index 000000000000..cd10cdb487df
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr120689.c
+@@ -0,0 +1,17 @@
++/* PR target/120689 */
++/* { dg-do compile { target lp64 } } */
++/* { dg-options "-O2 -mtune=generic -fno-stack-protector -masm=att" } */
++/* { dg-final { scan-assembler-not "\t\(movzbl\|shrl\|salq\|orq\)\t" } } */
++
++struct S { char a, b, c; };
++
++[[gnu::noipa]]
++void foo (struct S x, struct S y, struct S z)
++{
++}
++
++void
++bar (struct S x, struct S y, struct S z)
++{
++  [[gnu::musttail]] return foo (x, y, z);
++}
+
+base-commit: 9cc6cfdca980a508f72865830a09b353140e738e
+-- 
+2.50.0
+
