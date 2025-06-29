@@ -1,0 +1,873 @@
+https://inbox.sourceware.org/gcc-patches/CAMe9rOpBxdLoJrGZqt5_JhPAuvWUOpGWMLiGg=dSKkYtdqV9KA@mail.gmail.com/
+
+From cefa274db3abc864bbe4d163d78108fb50fb9e97 Mon Sep 17 00:00:00 2001
+Message-ID: <cefa274db3abc864bbe4d163d78108fb50fb9e97.1751156913.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Sat, 28 Jun 2025 09:39:41 +0800
+Subject: [PATCH] x86: Preserve frame pointer for no_callee_saved_registers
+ attribute
+
+Update functions with no_callee_saved_registers/preserve_none attribute
+to preserve frame pointer since caller may use it to save the current
+stack:
+
+	pushq	%rbp
+	movq	%rsp, %rbp
+	...
+	call	function
+	...
+	leave
+	ret
+
+If callee changes frame pointer without restoring it, caller will fail
+to restore its stack after callee returns.
+
+There are no regressions on Linux/x86-64.  Also tested with
+
+https://github.com/python/cpython
+
+configured with "./configure --with-tail-call-interp".
+
+gcc/
+
+	PR target/120840
+	* config/i386/i386-expand.cc (ix86_expand_call): Don't mark
+	hard frame pointer as clobber.
+	* config/i386/i386-options.cc (ix86_set_func_type): Use
+	TYPE_NO_CALLEE_SAVED_REGISTERS instead of
+	TYPE_NO_CALLEE_SAVED_REGISTERS_EXCEPT_BP.
+	* config/i386/i386.cc (ix86_function_ok_for_sibcall): Remove the
+	TYPE_NO_CALLEE_SAVED_REGISTERS_EXCEPT_BP check.
+	(ix86_save_reg): Merge TYPE_NO_CALLEE_SAVED_REGISTERS and
+	TYPE_PRESERVE_NONE with TYPE_NO_CALLEE_SAVED_REGISTERS_EXCEPT_BP.
+	* config/i386/i386.h (call_saved_registers_type): Remove
+	TYPE_NO_CALLEE_SAVED_REGISTERS_EXCEPT_BP.
+	* doc/extend.texi: Update no_callee_saved_registers documentation.
+
+gcc/testsuite/
+
+	PR target/120840
+	* gcc.target/i386/no-callee-saved-1.c: Updated.
+	* gcc.target/i386/no-callee-saved-2.c: Likewise.
+	* gcc.target/i386/no-callee-saved-7.c: Likewise.
+	* gcc.target/i386/no-callee-saved-8.c: Likewise.
+	* gcc.target/i386/no-callee-saved-9.c: Likewise.
+	* gcc.target/i386/no-callee-saved-10.c: Likewise.
+	* gcc.target/i386/no-callee-saved-18.c: Likewise.
+	* gcc.target/i386/no-callee-saved-19a.c: Likewise.
+	* gcc.target/i386/no-callee-saved-19c.c: Likewise.
+	* gcc.target/i386/no-callee-saved-19d.c: Likewise.
+	* gcc.target/i386/pr119784a.c: Likewise.
+	* gcc.target/i386/preserve-none-6.c: Likewise.
+	* gcc.target/i386/preserve-none-7.c: Likewise.
+	* gcc.target/i386/preserve-none-12.c: Likewise.
+	* gcc.target/i386/preserve-none-13.c: Likewise.
+	* gcc.target/i386/preserve-none-14.c: Likewise.
+	* gcc.target/i386/preserve-none-15.c: Likewise.
+	* gcc.target/i386/preserve-none-23.c: Likewise.
+	* gcc.target/i386/pr120840-1a.c: New test.
+	* gcc.target/i386/pr120840-1b.c: Likewise.
+	* gcc.target/i386/pr120840-1c.c: Likewise.
+	* gcc.target/i386/pr120840-1d.c: Likewise.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ gcc/config/i386/i386-expand.cc                |  1 +
+ gcc/config/i386/i386-options.cc               | 23 +++--
+ gcc/config/i386/i386.cc                       |  5 --
+ gcc/config/i386/i386.h                        |  3 -
+ gcc/doc/extend.texi                           |  9 +-
+ .../gcc.target/i386/no-callee-saved-1.c       |  6 +-
+ .../gcc.target/i386/no-callee-saved-10.c      |  4 +-
+ .../gcc.target/i386/no-callee-saved-18.c      |  4 +-
+ .../gcc.target/i386/no-callee-saved-19a.c     | 32 ++++---
+ .../gcc.target/i386/no-callee-saved-19c.c     | 26 +++---
+ .../gcc.target/i386/no-callee-saved-19d.c     | 28 +++----
+ .../gcc.target/i386/no-callee-saved-2.c       |  6 +-
+ .../gcc.target/i386/no-callee-saved-7.c       |  4 +-
+ .../gcc.target/i386/no-callee-saved-8.c       |  4 +-
+ .../gcc.target/i386/no-callee-saved-9.c       |  4 +-
+ gcc/testsuite/gcc.target/i386/pr119784a.c     | 27 +++---
+ gcc/testsuite/gcc.target/i386/pr120840-1a.c   | 83 +++++++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr120840-1b.c   | 20 +++++
+ gcc/testsuite/gcc.target/i386/pr120840-1c.c   | 20 +++++
+ gcc/testsuite/gcc.target/i386/pr120840-1d.c   | 20 +++++
+ .../gcc.target/i386/preserve-none-12.c        |  4 +-
+ .../gcc.target/i386/preserve-none-13.c        |  4 +-
+ .../gcc.target/i386/preserve-none-14.c        |  4 +-
+ .../gcc.target/i386/preserve-none-15.c        |  4 +-
+ .../gcc.target/i386/preserve-none-23.c        |  4 +-
+ .../gcc.target/i386/preserve-none-6.c         |  6 +-
+ .../gcc.target/i386/preserve-none-7.c         |  6 +-
+ 27 files changed, 248 insertions(+), 113 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr120840-1a.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr120840-1b.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr120840-1c.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr120840-1d.c
+
+diff --git a/gcc/config/i386/i386-expand.cc b/gcc/config/i386/i386-expand.cc
+index c1c0cf9ff80a..83076adb55db 100644
+--- a/gcc/config/i386/i386-expand.cc
++++ b/gcc/config/i386/i386-expand.cc
+@@ -10377,6 +10377,7 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
+       char c_mask = CALL_USED_REGISTERS_MASK (is_64bit_ms_abi);
+       for (int i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+ 	if (!fixed_regs[i]
++	    && i != HARD_FRAME_POINTER_REGNUM
+ 	    && !(ix86_call_used_regs[i] == 1
+ 		 || (ix86_call_used_regs[i] & c_mask))
+ 	    && !STACK_REGNO_P (i)
+diff --git a/gcc/config/i386/i386-options.cc b/gcc/config/i386/i386-options.cc
+index 60c04f65d9f9..09cb1337f94c 100644
+--- a/gcc/config/i386/i386-options.cc
++++ b/gcc/config/i386/i386-options.cc
+@@ -3280,19 +3280,18 @@ ix86_set_func_type (tree fndecl)
+   if (lookup_attribute ("preserve_none",
+ 			     TYPE_ATTRIBUTES (TREE_TYPE (fndecl))))
+     no_callee_saved_registers = TYPE_PRESERVE_NONE;
+-  else if (lookup_attribute ("no_callee_saved_registers",
+-			TYPE_ATTRIBUTES (TREE_TYPE (fndecl))))
++  else if ((lookup_attribute ("no_callee_saved_registers",
++			      TYPE_ATTRIBUTES (TREE_TYPE (fndecl))))
++	   || (ix86_noreturn_no_callee_saved_registers
++	       && TREE_THIS_VOLATILE (fndecl)
++	       && optimize
++	       && !optimize_debug
++	       && (TREE_NOTHROW (fndecl) || !flag_exceptions)
++	       && !lookup_attribute ("interrupt",
++				     TYPE_ATTRIBUTES (TREE_TYPE (fndecl)))
++	       && !lookup_attribute ("no_caller_saved_registers",
++				 TYPE_ATTRIBUTES (TREE_TYPE (fndecl)))))
+     no_callee_saved_registers = TYPE_NO_CALLEE_SAVED_REGISTERS;
+-  else if (ix86_noreturn_no_callee_saved_registers
+-	   && TREE_THIS_VOLATILE (fndecl)
+-	   && optimize
+-	   && !optimize_debug
+-	   && (TREE_NOTHROW (fndecl) || !flag_exceptions)
+-	   && !lookup_attribute ("interrupt",
+-				 TYPE_ATTRIBUTES (TREE_TYPE (fndecl)))
+-	   && !lookup_attribute ("no_caller_saved_registers",
+-				 TYPE_ATTRIBUTES (TREE_TYPE (fndecl))))
+-    no_callee_saved_registers = TYPE_NO_CALLEE_SAVED_REGISTERS_EXCEPT_BP;
+ 
+   if (cfun->machine->func_type == TYPE_UNKNOWN)
+     {
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index 5e9559f5c05e..44763c8eb014 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -1043,8 +1043,6 @@ ix86_function_ok_for_sibcall (tree decl, tree exp)
+   if ((cfun->machine->call_saved_registers
+        != TYPE_NO_CALLEE_SAVED_REGISTERS)
+       && cfun->machine->call_saved_registers != TYPE_PRESERVE_NONE
+-      && (cfun->machine->call_saved_registers
+-	  != TYPE_NO_CALLEE_SAVED_REGISTERS_EXCEPT_BP)
+       && ix86_type_no_callee_saved_registers_p (type))
+     return false;
+ 
+@@ -6774,9 +6772,6 @@ ix86_save_reg (unsigned int regno, bool maybe_eh_return, bool ignore_outlined)
+ 
+     case TYPE_NO_CALLEE_SAVED_REGISTERS:
+     case TYPE_PRESERVE_NONE:
+-      return false;
+-
+-    case TYPE_NO_CALLEE_SAVED_REGISTERS_EXCEPT_BP:
+       if (regno != HARD_FRAME_POINTER_REGNUM)
+ 	return false;
+       break;
+diff --git a/gcc/config/i386/i386.h b/gcc/config/i386/i386.h
+index a275a32682e6..45de61c64b23 100644
+--- a/gcc/config/i386/i386.h
++++ b/gcc/config/i386/i386.h
+@@ -2804,9 +2804,6 @@ enum call_saved_registers_type
+   /* The current function is a function specified with the
+      "no_callee_saved_registers" attribute.  */
+   TYPE_NO_CALLEE_SAVED_REGISTERS,
+-  /* The current function is a function specified with the "noreturn"
+-     attribute.  */
+-  TYPE_NO_CALLEE_SAVED_REGISTERS_EXCEPT_BP,
+   /* The current function is a function specified with the
+      "preserve_none" attribute.  */
+   TYPE_PRESERVE_NONE,
+diff --git a/gcc/doc/extend.texi b/gcc/doc/extend.texi
+index 946105d5cdcc..e9aa12ba1041 100644
+--- a/gcc/doc/extend.texi
++++ b/gcc/doc/extend.texi
+@@ -6124,10 +6124,11 @@ pass arguments, unless it takes a variable number of arguments.
+ @cindex @code{no_callee_saved_registers} function attribute, x86
+ @item no_callee_saved_registers
+ Use this attribute to indicate that the specified function has no
+-callee-saved registers. That is, all registers can be used as scratch
+-registers. For example, this attribute can be used for a function
+-called from the interrupt handler assembly stub which will preserve
+-all registers and return from interrupt.
++callee-saved registers. That is, all registers, except for stack and
++frame pointers, can be used as scratch registers. For example, this
++attribute can be used for a function called from the interrupt handler
++assembly stub which will preserve all registers and return from
++interrupt.
+ 
+ @cindex @code{preserve_none} function attribute, x86
+ @item preserve_none
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-1.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-1.c
+index 599c2a3fa191..e535485b1cf3 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-1.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-1.c
+@@ -26,5 +26,7 @@ foo (void *frame)
+   }
+ }
+ 
+-/* { dg-final { scan-assembler-not "push" } } */
+-/* { dg-final { scan-assembler-not "pop" } } */
++/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*" 1 } } */
++/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*" 1 } } */
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-10.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-10.c
+index 87766c6cd886..6c54144350e6 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-10.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-10.c
+@@ -18,7 +18,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)cx" 1 } } */
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)dx" 1 } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)si" 1 } } */
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)di" 1 } } */
+ /* { dg-final { scan-assembler-times "pushq\[\\t \]*%r8" 1 { target { ! ia32 } } } } */
+@@ -33,7 +33,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)cx" 1 } } */
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)dx" 1 } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)si" 1 } } */
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)di" 1 } } */
+ /* { dg-final { scan-assembler-times "popq\[\\t \]*%r8" 1 { target { ! ia32 } } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-18.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-18.c
+index e7101009be47..128b9c46e8ec 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-18.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-18.c
+@@ -19,7 +19,7 @@ foo (uintptr_t p)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "pushq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%edi" 1 { target ia32 } } } */
+@@ -36,7 +36,7 @@ foo (uintptr_t p)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "popq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%edi" 1 { target ia32 } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-19a.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-19a.c
+index 25ef8558a5db..12f35cfa8bba 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-19a.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-19a.c
+@@ -16,9 +16,9 @@
+ 
+ #define NEXT { op_t *op = next; [[gnu::musttail]] return (*op)(op + 1); }
+ #ifdef __x86_64__
+-# define CLOBBER asm("" ::: "r12","r13","r14","r15","rbp","rbx")
++# define CLOBBER asm("" ::: "r12","r13","r14","r15","rbx")
+ #else
+-# define CLOBBER asm("" ::: "ebp","ebx")
++# define CLOBBER asm("" ::: "ebx")
+ #endif
+ #define DONT_SAVE_REGS __attribute__((no_callee_saved_registers))
+ #define SAVE_REGS __attribute__((no_caller_saved_registers))
+@@ -83,15 +83,14 @@ op_t code[] = { inc, inc, dec, end, };
+ **	.cfi_startproc
+ **	subq	\$376, %rsp
+ **...
+-**	movq	%rax, 256\(%rsp\)
+-**	movq	%rdx, 264\(%rsp\)
+-**	movq	%rcx, 272\(%rsp\)
+-**	movq	%rbx, 280\(%rsp\)
+-**	movq	%rsi, 288\(%rsp\)
+-**	movq	%rdi, 296\(%rsp\)
++**	movq	%rdi, 304\(%rsp\)
+ **...
+ **	movl	\$code\+8, %edi
+-**	movq	%rbp, 304\(%rsp\)
++**	movq	%rax, 264\(%rsp\)
++**	movq	%rdx, 272\(%rsp\)
++**	movq	%rcx, 280\(%rsp\)
++**	movq	%rbx, 288\(%rsp\)
++**	movq	%rsi, 296\(%rsp\)
+ **	movq	%r8, 312\(%rsp\)
+ **	movq	%r9, 320\(%rsp\)
+ **	movq	%r10, 328\(%rsp\)
+@@ -132,13 +131,12 @@ op_t code[] = { inc, inc, dec, end, };
+ **	movaps	176\(%rsp\), %xmm11
+ **	movaps	192\(%rsp\), %xmm12
+ **	movaps	208\(%rsp\), %xmm13
+-**	movq	256\(%rsp\), %rax
+-**	movq	264\(%rsp\), %rdx
+-**	movq	272\(%rsp\), %rcx
+-**	movq	280\(%rsp\), %rbx
+-**	movq	288\(%rsp\), %rsi
+-**	movq	296\(%rsp\), %rdi
+-**	movq	304\(%rsp\), %rbp
++**	movq	264\(%rsp\), %rax
++**	movq	272\(%rsp\), %rdx
++**	movq	280\(%rsp\), %rcx
++**	movq	288\(%rsp\), %rbx
++**	movq	296\(%rsp\), %rsi
++**	movq	304\(%rsp\), %rdi
+ **	movq	312\(%rsp\), %r8
+ **	movq	320\(%rsp\), %r9
+ **	movq	328\(%rsp\), %r10
+@@ -146,8 +144,8 @@ op_t code[] = { inc, inc, dec, end, };
+ **	movq	344\(%rsp\), %r12
+ **	movq	352\(%rsp\), %r13
+ **	movq	360\(%rsp\), %r14
+-**	movaps	224\(%rsp\), %xmm14
+ **	movq	368\(%rsp\), %r15
++**	movaps	224\(%rsp\), %xmm14
+ **	movaps	240\(%rsp\), %xmm15
+ **	addq	\$376, %rsp
+ **...
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-19c.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-19c.c
+index 2ad388d1a567..05aca9f4b119 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-19c.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-19c.c
+@@ -51,13 +51,12 @@
+ **.LFB[0-9]+:
+ **	.cfi_startproc
+ **...
+-**	movl	%eax, 140\(%esp\)
+-**	movl	%edx, 144\(%esp\)
+-**	movl	%ecx, 148\(%esp\)
+-**	movl	%ebx, 152\(%esp\)
+-**	movl	%esi, 156\(%esp\)
+-**	movl	%edi, 160\(%esp\)
+-**	movl	%ebp, 164\(%esp\)
++**	movl	%eax, 144\(%esp\)
++**	movl	%edx, 148\(%esp\)
++**	movl	%ecx, 152\(%esp\)
++**	movl	%ebx, 156\(%esp\)
++**	movl	%esi, 160\(%esp\)
++**	movl	%edi, 164\(%esp\)
+ **	movaps	%xmm0, 12\(%esp\)
+ **	movaps	%xmm1, 28\(%esp\)
+ **	movaps	%xmm2, 44\(%esp\)
+@@ -78,13 +77,12 @@
+ **	movaps	96\(%esp\), %xmm5
+ **	movaps	112\(%esp\), %xmm6
+ **	movaps	128\(%esp\), %xmm7
+-**	movl	144\(%esp\), %eax
+-**	movl	148\(%esp\), %edx
+-**	movl	152\(%esp\), %ecx
+-**	movl	156\(%esp\), %ebx
+-**	movl	160\(%esp\), %esi
+-**	movl	164\(%esp\), %edi
+-**	movl	168\(%esp\), %ebp
++**	movl	148\(%esp\), %eax
++**	movl	152\(%esp\), %edx
++**	movl	156\(%esp\), %ecx
++**	movl	160\(%esp\), %ebx
++**	movl	164\(%esp\), %esi
++**	movl	168\(%esp\), %edi
+ **...
+ **	ret
+ **	.cfi_endproc
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-19d.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-19d.c
+index a18d12e58997..b3caa3d81b2d 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-19d.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-19d.c
+@@ -50,15 +50,14 @@
+ **	.cfi_startproc
+ **	subq	\$504, %rsp
+ **...
+-**	movq	%rax, 256\(%rsp\)
+-**	movq	%rdx, 264\(%rsp\)
+-**	movq	%rcx, 272\(%rsp\)
+-**	movq	%rbx, 280\(%rsp\)
+-**	movq	%rsi, 288\(%rsp\)
+-**	movq	%rdi, 296\(%rsp\)
++**	movq	%rax, 264\(%rsp\)
++**	movq	%rdx, 272\(%rsp\)
++**	movq	%rcx, 280\(%rsp\)
++**	movq	%rbx, 288\(%rsp\)
++**	movq	%rsi, 296\(%rsp\)
++**	movq	%rdi, 304\(%rsp\)
+ **...
+ **	movl	\$code\+8, %edi
+-**	movq	%rbp, 304\(%rsp\)
+ **	movq	%r8, 312\(%rsp\)
+ **	movq	%r9, 320\(%rsp\)
+ **	movq	%r10, 328\(%rsp\)
+@@ -116,13 +115,12 @@
+ **	movaps	176\(%rsp\), %xmm11
+ **	movaps	192\(%rsp\), %xmm12
+ **	movaps	208\(%rsp\), %xmm13
+-**	movq	256\(%rsp\), %rax
+-**	movq	264\(%rsp\), %rdx
+-**	movq	272\(%rsp\), %rcx
+-**	movq	280\(%rsp\), %rbx
+-**	movq	288\(%rsp\), %rsi
+-**	movq	296\(%rsp\), %rdi
+-**	movq	304\(%rsp\), %rbp
++**	movq	264\(%rsp\), %rax
++**	movq	272\(%rsp\), %rdx
++**	movq	280\(%rsp\), %rcx
++**	movq	288\(%rsp\), %rbx
++**	movq	296\(%rsp\), %rsi
++**	movq	304\(%rsp\), %rdi
+ **	movq	312\(%rsp\), %r8
+ **	movq	320\(%rsp\), %r9
+ **	movq	328\(%rsp\), %r10
+@@ -132,9 +130,9 @@
+ **	movq	360\(%rsp\), %r14
+ **	movq	368\(%rsp\), %r15
+ **	movq	376\(%rsp\), %r16
++**	movq	384\(%rsp\), %r17
+ **	movaps	224\(%rsp\), %xmm14
+ **	movaps	240\(%rsp\), %xmm15
+-**	movq	384\(%rsp\), %r17
+ **	movq	392\(%rsp\), %r18
+ **	movq	400\(%rsp\), %r19
+ **	movq	408\(%rsp\), %r20
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-2.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-2.c
+index 98e2701d925e..e074ca51df40 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-2.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-2.c
+@@ -26,5 +26,7 @@ foo (void *frame)
+   }
+ }
+ 
+-/* { dg-final { scan-assembler-not "push" } } */
+-/* { dg-final { scan-assembler-not "pop" } } */
++/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*" 1 } } */
++/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*" 1 } } */
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-7.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-7.c
+index a1837fdfd4b5..821d1e2a4d42 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-7.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-7.c
+@@ -17,7 +17,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "pushq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%edi" 1 { target ia32 } } } */
+@@ -34,7 +34,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "popq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%edi" 1 { target ia32 } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-8.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-8.c
+index 90b98a21aef7..ed3d96bdca05 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-8.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-8.c
+@@ -18,7 +18,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "pushq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%edi" 1 { target ia32 } } } */
+@@ -35,7 +35,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "popq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%edi" 1 { target ia32 } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/no-callee-saved-9.c b/gcc/testsuite/gcc.target/i386/no-callee-saved-9.c
+index e261100ac1a1..7730c5903d4b 100644
+--- a/gcc/testsuite/gcc.target/i386/no-callee-saved-9.c
++++ b/gcc/testsuite/gcc.target/i386/no-callee-saved-9.c
+@@ -17,7 +17,7 @@ foo (fn_t bar)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "pushq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%edi" 1 { target ia32 } } } */
+@@ -34,7 +34,7 @@ foo (fn_t bar)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "popq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%edi" 1 { target ia32 } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/pr119784a.c b/gcc/testsuite/gcc.target/i386/pr119784a.c
+index 8a119d4cc1f8..a3b7e4aa7cca 100644
+--- a/gcc/testsuite/gcc.target/i386/pr119784a.c
++++ b/gcc/testsuite/gcc.target/i386/pr119784a.c
+@@ -11,14 +11,12 @@
+ **	.cfi_startproc
+ **	subq	\$248, %rsp
+ **...
+-**	movq	%rax, \(%rsp\)
+-**	movq	%rdx, 8\(%rsp\)
+-**	movq	%rcx, 16\(%rsp\)
+-**	movq	%rbx, 24\(%rsp\)
+-**	movq	%rsi, 32\(%rsp\)
+-**	movq	%rdi, 40\(%rsp\)
+-**...
+-**	movq	%rbp, 48\(%rsp\)
++**	movq	%rax, 8\(%rsp\)
++**	movq	%rdx, 16\(%rsp\)
++**	movq	%rcx, 24\(%rsp\)
++**	movq	%rbx, 32\(%rsp\)
++**	movq	%rsi, 40\(%rsp\)
++**	movq	%rdi, 48\(%rsp\)
+ **	movq	%r8, 56\(%rsp\)
+ **	movq	%r9, 64\(%rsp\)
+ **	movq	%r10, 72\(%rsp\)
+@@ -45,13 +43,12 @@
+ **	movq	%r31, 240\(%rsp\)
+ **...
+ **	call	\*code\(%rip\)
+-**	movq	\(%rsp\), %rax
+-**	movq	8\(%rsp\), %rdx
+-**	movq	16\(%rsp\), %rcx
+-**	movq	24\(%rsp\), %rbx
+-**	movq	32\(%rsp\), %rsi
+-**	movq	40\(%rsp\), %rdi
+-**	movq	48\(%rsp\), %rbp
++**	movq	8\(%rsp\), %rax
++**	movq	16\(%rsp\), %rdx
++**	movq	24\(%rsp\), %rcx
++**	movq	32\(%rsp\), %rbx
++**	movq	40\(%rsp\), %rsi
++**	movq	48\(%rsp\), %rdi
+ **	movq	56\(%rsp\), %r8
+ **	movq	64\(%rsp\), %r9
+ **	movq	72\(%rsp\), %r10
+diff --git a/gcc/testsuite/gcc.target/i386/pr120840-1a.c b/gcc/testsuite/gcc.target/i386/pr120840-1a.c
+new file mode 100644
+index 000000000000..cc5800311b30
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr120840-1a.c
+@@ -0,0 +1,83 @@
++/* { dg-do run } */
++/* { dg-options "-save-temps -O2 -fno-omit-frame-pointer -mtune-ctrl=prologue_using_move,epilogue_using_move,use_leave" } */
++
++#ifndef DONT_SAVE_REGS1
++# define DONT_SAVE_REGS1 __attribute__((no_callee_saved_registers))
++#endif
++#ifndef DONT_SAVE_REGS2
++# define DONT_SAVE_REGS2 __attribute__((no_callee_saved_registers))
++#endif
++
++/* Keep labels and directives ('.cfi_startproc', '.cfi_endproc').  */
++/* { dg-final { check-function-bodies "**" "" "" { target "*-*-linux*" } {^\t?\.}  } } */
++
++/*
++**do_test:
++**.LFB[0-9]+:
++**...
++**	leave
++**...
++**	ret
++**...
++*/
++
++#include <stdlib.h>
++
++DONT_SAVE_REGS1
++__attribute__ ((weak, __optimize__ ("-fomit-frame-pointer")))
++void
++continuation (int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
++{
++  /* Clobber frame pointer register.  */
++  asm ("xor %%ebp, %%ebp" ::: "ebp");
++
++  if (arg1 != 17)
++    abort ();
++  if (arg2 != 8)
++    abort ();
++  if (arg3 != 20)
++    abort ();
++  if (arg4 != -3)
++    abort ();
++  if (arg5 != -4)
++    abort ();
++  if (arg6 != 26)
++    abort ();
++}
++
++DONT_SAVE_REGS2
++__attribute__ ((weak, __optimize__ ("-fomit-frame-pointer")))
++void
++entry (int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
++{
++  /* Clobber frame pointer register.  */
++  asm ("xor %%ebp, %%ebp" ::: "ebp");
++
++  if (arg1 != 17)
++    abort ();
++  if (arg2 != 8)
++    abort ();
++  if (arg3 != 20)
++    abort ();
++  if (arg4 != -3)
++    abort ();
++  if (arg5 != -4)
++    abort ();
++  if (arg6 != 26)
++    abort ();
++  continuation (arg1, arg2, arg3, arg4, arg5, arg6);
++}
++
++__attribute__ ((weak))
++void
++do_test (void)
++{
++  entry (17, 8, 20, -3, -4, 26);
++}
++
++int
++main (void)
++{
++  do_test ();
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/i386/pr120840-1b.c b/gcc/testsuite/gcc.target/i386/pr120840-1b.c
+new file mode 100644
+index 000000000000..a759e3402b5c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr120840-1b.c
+@@ -0,0 +1,20 @@
++/* { dg-do run } */
++/* { dg-options "-save-temps -O2 -fno-omit-frame-pointer -mtune-ctrl=prologue_using_move,epilogue_using_move,use_leave" } */
++
++#define DONT_SAVE_REGS1 __attribute__((preserve_none))
++#define DONT_SAVE_REGS2 __attribute__((no_callee_saved_registers))
++
++/* Keep labels and directives ('.cfi_startproc', '.cfi_endproc').  */
++/* { dg-final { check-function-bodies "**" "" "" { target "*-*-linux*" } {^\t?\.}  } } */
++
++/*
++**do_test:
++**.LFB[0-9]+:
++**...
++**	leave
++**...
++**	ret
++**...
++*/
++
++#include "pr120840-1a.c"
+diff --git a/gcc/testsuite/gcc.target/i386/pr120840-1c.c b/gcc/testsuite/gcc.target/i386/pr120840-1c.c
+new file mode 100644
+index 000000000000..84aa353d705b
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr120840-1c.c
+@@ -0,0 +1,20 @@
++/* { dg-do run } */
++/* { dg-options "-save-temps -O2 -fno-omit-frame-pointer -mtune-ctrl=prologue_using_move,epilogue_using_move,use_leave" } */
++
++#define DONT_SAVE_REGS1 __attribute__((no_callee_saved_registers))
++#define DONT_SAVE_REGS2 __attribute__((preserve_none))
++
++/* Keep labels and directives ('.cfi_startproc', '.cfi_endproc').  */
++/* { dg-final { check-function-bodies "**" "" "" { target "*-*-linux*" } {^\t?\.}  } } */
++
++/*
++**do_test:
++**.LFB[0-9]+:
++**...
++**	leave
++**...
++**	ret
++**...
++*/
++
++#include "pr120840-1a.c"
+diff --git a/gcc/testsuite/gcc.target/i386/pr120840-1d.c b/gcc/testsuite/gcc.target/i386/pr120840-1d.c
+new file mode 100644
+index 000000000000..a6b38a6aff17
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr120840-1d.c
+@@ -0,0 +1,20 @@
++/* { dg-do run } */
++/* { dg-options "-save-temps -O2 -fno-omit-frame-pointer -mtune-ctrl=prologue_using_move,epilogue_using_move,use_leave" } */
++
++#define DONT_SAVE_REGS1 __attribute__((preserve_none))
++#define DONT_SAVE_REGS2 __attribute__((preserve_none))
++
++/* Keep labels and directives ('.cfi_startproc', '.cfi_endproc').  */
++/* { dg-final { check-function-bodies "**" "" "" { target "*-*-linux*" } {^\t?\.}  } } */
++
++/*
++**do_test:
++**.LFB[0-9]+:
++**...
++**	leave
++**...
++**	ret
++**...
++*/
++
++#include "pr120840-1a.c"
+diff --git a/gcc/testsuite/gcc.target/i386/preserve-none-12.c b/gcc/testsuite/gcc.target/i386/preserve-none-12.c
+index 6960f6607972..b2fd0abcd065 100644
+--- a/gcc/testsuite/gcc.target/i386/preserve-none-12.c
++++ b/gcc/testsuite/gcc.target/i386/preserve-none-12.c
+@@ -17,7 +17,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "pushq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%edi" 1 { target ia32 } } } */
+@@ -34,7 +34,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "popq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%edi" 1 { target ia32 } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/preserve-none-13.c b/gcc/testsuite/gcc.target/i386/preserve-none-13.c
+index 31b33201e852..d0f309979c64 100644
+--- a/gcc/testsuite/gcc.target/i386/preserve-none-13.c
++++ b/gcc/testsuite/gcc.target/i386/preserve-none-13.c
+@@ -18,7 +18,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "pushq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%edi" 1 { target ia32 } } } */
+@@ -35,7 +35,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "popq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%edi" 1 { target ia32 } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/preserve-none-14.c b/gcc/testsuite/gcc.target/i386/preserve-none-14.c
+index 64a957ddf833..ca23b586fa16 100644
+--- a/gcc/testsuite/gcc.target/i386/preserve-none-14.c
++++ b/gcc/testsuite/gcc.target/i386/preserve-none-14.c
+@@ -17,7 +17,7 @@ foo (fn_t bar)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "pushq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%edi" 1 { target ia32 } } } */
+@@ -34,7 +34,7 @@ foo (fn_t bar)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "popq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%edi" 1 { target ia32 } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/preserve-none-15.c b/gcc/testsuite/gcc.target/i386/preserve-none-15.c
+index 8af930bd9141..54527e3a8479 100644
+--- a/gcc/testsuite/gcc.target/i386/preserve-none-15.c
++++ b/gcc/testsuite/gcc.target/i386/preserve-none-15.c
+@@ -18,7 +18,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)cx" 1 } } */
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)dx" 1 } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)si" 1 } } */
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)di" 1 } } */
+ /* { dg-final { scan-assembler-times "pushq\[\\t \]*%r8" 1 { target { ! ia32 } } } } */
+@@ -33,7 +33,7 @@ foo (void)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)cx" 1 } } */
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)dx" 1 } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)si" 1 } } */
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)di" 1 } } */
+ /* { dg-final { scan-assembler-times "popq\[\\t \]*%r8" 1 { target { ! ia32 } } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/preserve-none-23.c b/gcc/testsuite/gcc.target/i386/preserve-none-23.c
+index 8cc933f8aa8f..8e83879443fa 100644
+--- a/gcc/testsuite/gcc.target/i386/preserve-none-23.c
++++ b/gcc/testsuite/gcc.target/i386/preserve-none-23.c
+@@ -19,7 +19,7 @@ foo (uintptr_t p)
+ /* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "push(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "pushq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "pushl\[\\t \]*%edi" 1 { target ia32 } } } */
+@@ -36,7 +36,7 @@ foo (uintptr_t p)
+ /* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bx" 1 } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)cx" } } */
+ /* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)dx" } } */
+-/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-not "pop(?:l|q)\[\\t \]*%(?:e|r)bp" } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%esi" 1 { target ia32 } } } */
+ /* { dg-final { scan-assembler-not "popq\[\\t \]*%rsi" { target { ! ia32 } } } } */
+ /* { dg-final { scan-assembler-times "popl\[\\t \]*%edi" 1 { target ia32 } } } */
+diff --git a/gcc/testsuite/gcc.target/i386/preserve-none-6.c b/gcc/testsuite/gcc.target/i386/preserve-none-6.c
+index 2606ea3bc198..037f9ecfa036 100644
+--- a/gcc/testsuite/gcc.target/i386/preserve-none-6.c
++++ b/gcc/testsuite/gcc.target/i386/preserve-none-6.c
+@@ -26,5 +26,7 @@ foo (void *frame)
+   }
+ }
+ 
+-/* { dg-final { scan-assembler-not "push" } } */
+-/* { dg-final { scan-assembler-not "pop" } } */
++/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*" 1 } } */
++/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*" 1 } } */
+diff --git a/gcc/testsuite/gcc.target/i386/preserve-none-7.c b/gcc/testsuite/gcc.target/i386/preserve-none-7.c
+index 79ce761eaf5c..2c80560887c2 100644
+--- a/gcc/testsuite/gcc.target/i386/preserve-none-7.c
++++ b/gcc/testsuite/gcc.target/i386/preserve-none-7.c
+@@ -26,5 +26,7 @@ foo (void *frame)
+   }
+ }
+ 
+-/* { dg-final { scan-assembler-not "push" } } */
+-/* { dg-final { scan-assembler-not "pop" } } */
++/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*%(?:e|r)bp" 1 } } */
++/* { dg-final { scan-assembler-times "push(?:l|q)\[\\t \]*" 1 } } */
++/* { dg-final { scan-assembler-times "pop(?:l|q)\[\\t \]*" 1 } } */
+
+base-commit: 8dcb922452516ebbf362e7c202b48d8ef547edce
+-- 
+2.50.0
+
