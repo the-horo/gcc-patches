@@ -1,6 +1,8 @@
 5	????
 
 	- 85_all_PR120840.patch
+	+ 85_all_PR120929-Revert-Use-the-counted_by-attribute-of-pointers-in-a.patch
+	+ 86_all_PR120929-Revert-Use-the-counted_by-attribute-of-pointers-in-b.patch
 
 4	30 June 2025
 
